@@ -24,14 +24,16 @@ def main():
     pipeline = Gst.parse_launch("""
         videotestsrc pattern=snow name=src ! video/x-raw,width=1920,height=1080,framerate=30/1 ! 
         videoconvert ! x264enc speed-preset=ultrafast tune=zerolatency name=x264enc ! h264parse ! 
-        rtph264pay config-interval=1 name=rtph264pay ! udpsink host=127.0.0.1 port=5000 sync=false async=false
+        rtph264pay config-interval=1 name=rtph264pay ! udpsink host=127.0.0.1 port=5000 sync=false async=false name=udp
     """)
 
     # Get the encoder and payloader elements
+    src = pipeline.get_by_name("src")
     encoder = pipeline.get_by_name("x264enc")
     payloader = pipeline.get_by_name("rtph264pay")
+    udp = pipeline.get_by_name("udp")
 
-    if not encoder or not payloader:
+    if not src or not encoder or not payloader or not udp:
         print("Elements not found.")
         sys.exit(1)
 
@@ -40,15 +42,21 @@ def main():
     encoder_src_pad = encoder.get_static_pad("src")
     payloader_sink_pad = payloader.get_static_pad("sink")
     payloader_src_pad = payloader.get_static_pad("src")
+    udp_pad = udp.get_static_pad("sink")
+    src_pad = src.get_static_pad("src")
 
-    if encoder_sink_pad:
-        encoder_sink_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "\nencoder_sink")
-    if encoder_src_pad:
+    if src_pad and True:
+        src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "\nsrc")
+    if encoder_sink_pad and True:
+        encoder_sink_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "encoder_sink")
+    if encoder_src_pad and True:
         encoder_src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "encoder_src")
-    if payloader_sink_pad:
+    if payloader_sink_pad and False:
         payloader_sink_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "rtph264pay_sink")
-    if payloader_src_pad:
+    if payloader_src_pad and False:
         payloader_src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "rtph264pay_src")
+    if udp_pad and True:
+        udp_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "udp")
 
     # Set up the main loop
     mainloop = GObject.MainLoop()
