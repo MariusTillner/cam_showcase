@@ -12,8 +12,8 @@ def buffer_probe(pad, info, data):
     buffer = info.get_buffer()
     current_time = time.perf_counter()
     print(f"{data} buffer_size: {buffer.get_size()} bytes, time: {current_time}")
-    if data is "encoder_src":
-        print("\n")
+    if data == "encoder_src":
+        print() # newline
     return Gst.PadProbeReturn.OK
 
 def stop_pipeline(mainloop, pipeline):
