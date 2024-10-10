@@ -42,14 +42,14 @@ def main():
     paydeloader_sink_pad = paydeloader.get_static_pad("sink")
     paydeloader_src_pad = paydeloader.get_static_pad("src")
 
-    if decoder_sink_pad:
-        decoder_sink_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "decoder_sink")
-    if decoder_src_pad:
-        decoder_src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "decoder_src")
-    if paydeloader_sink_pad:
+    if paydeloader_sink_pad and False:
         paydeloader_sink_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "rtph264depay_sink")
-    if paydeloader_src_pad:
+    if paydeloader_src_pad and False:
         paydeloader_src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "rtph264depay_src")
+    if decoder_sink_pad and True:
+        decoder_sink_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "decoder_sink")
+    if decoder_src_pad and True:
+        decoder_src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "decoder_src")
 
     # Set up the main loop
     mainloop = GObject.MainLoop()
