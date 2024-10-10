@@ -12,7 +12,7 @@ def buffer_probe(pad, info, data):
     buffer = info.get_buffer()
     current_time = time.perf_counter()
     print(f"{data} buffer_size: {buffer.get_size()} bytes, time: {current_time}")
-    if data == "encoder_src":
+    if data == "decoder_src":
         print() # newline
     return Gst.PadProbeReturn.OK
 
@@ -37,19 +37,19 @@ def main():
         sys.exit(1)
 
     # Add buffer probes
-    encoder_sink_pad = decoder.get_static_pad("sink")
-    encoder_src_pad = decoder.get_static_pad("src")
-    payloader_sink_pad = paydeloader.get_static_pad("sink")
-    payloader_src_pad = paydeloader.get_static_pad("src")
+    decoder_sink_pad = decoder.get_static_pad("sink")
+    decoder_src_pad = decoder.get_static_pad("src")
+    paydeloader_sink_pad = paydeloader.get_static_pad("sink")
+    paydeloader_src_pad = paydeloader.get_static_pad("src")
 
-    if encoder_sink_pad:
-        encoder_sink_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "encoder_sink")
-    if encoder_src_pad:
-        encoder_src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "encoder_src")
-    if payloader_sink_pad:
-        payloader_sink_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "rtph264pay_sink")
-    if payloader_src_pad:
-        payloader_src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "rtph264pay_src")
+    if decoder_sink_pad:
+        decoder_sink_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "decoder_sink")
+    if decoder_src_pad:
+        decoder_src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "decoder_src")
+    if paydeloader_sink_pad:
+        paydeloader_sink_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "rtph264depay_sink")
+    if paydeloader_src_pad:
+        paydeloader_src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "rtph264depay_src")
 
     # Set up the main loop
     mainloop = GObject.MainLoop()
