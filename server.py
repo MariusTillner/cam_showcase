@@ -2,6 +2,7 @@
 import gi
 import sys
 import time
+import socket
 gi.require_version('Gst', '1.0')
 from gi.repository import Gst, GObject
 
@@ -12,8 +13,6 @@ def buffer_probe(pad, info, data):
     buffer = info.get_buffer()
     current_time = time.perf_counter()
     print(f"{data} buffer_size: {buffer.get_size()} bytes, time: {current_time}")
-    if data == "server_sink":
-        print() # newline
     return Gst.PadProbeReturn.OK
 
 def stop_pipeline(mainloop, pipeline):
@@ -22,10 +21,25 @@ def stop_pipeline(mainloop, pipeline):
     mainloop.quit()
 
 def main():
+    ack_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    client_address = ('127.0.0.1', 5001) # gstreamer udp socket is 127.0.0.1:5000
+
+    def on_new_frame(sink):
+        # Send an acknowledgment packet when a new frame is received
+        acknowledgment_message = b'Frame received'
+        ack_sock.sendto(acknowledgment_message, client_address)
+        print('Acknowledgment sent to client\n')
+
+        # Retrieve the buffer from appsink
+        sample = sink.emit('pull-sample')
+        return Gst.FlowReturn.OK
+
     # Create the GStreamer pipeline
     pipeline = Gst.parse_launch("""
         udpsrc port=5000 name=udp_src ! application/x-rtp, encoding-name=H264 ! rtph264depay name=rtph264depay ! queue !
-        avdec_h264 name=avdec_h264 ! videoconvert ! autovideosink name=server_sink
+        avdec_h264 name=avdec_h264 ! videoconvert ! tee name=t
+        t. ! queue ! appsink name=server_sink emit-signals=true
+        t. ! queue ! autovideosink
     """)
 
     # Get the encoder and payloader elements
@@ -58,6 +72,9 @@ def main():
         decoder_src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "decoder_src")
     if server_sink_pad and True:
         server_sink_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "server_sink")
+
+    # Add Acknowledgment callback
+    server_sink.connect('new-sample', on_new_frame)
 
     # Set up the main loop
     mainloop = GObject.MainLoop()
