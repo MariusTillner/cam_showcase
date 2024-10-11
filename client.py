@@ -2,22 +2,69 @@
 import gi
 import sys
 import time
+import threading
+from threading import Lock
+import socket
+from Latency import Latency
 gi.require_version('Gst', '1.0')
 from gi.repository import Gst, GObject
+
 
 # Initialize GStreamer
 Gst.init(None)
 
+# Shared dictionary and lock
+shared_dict = {"send_count": 0, "receive_count":0, "latency_class": list()}
+data_lock = Lock()
+
+def log_buffer_probe(data, buffer_size):
+    if data == 'encoder_sink':
+        send_c = shared_dict["send_count"]
+        new_lat = Latency(send_c, buffer_size, time.perf_counter())
+        shared_dict["latency_class"].append(new_lat)
+    elif data == 'encoder_src':
+        latency = shared_dict["latency_class"][-1]
+        latency.enc_buf_s = buffer_size
+        latency.enc_buf_ts = time.perf_counter()
+        shared_dict["send_count"] += 1 # new image is sent, increase counter
+    else:
+        pass
+
 def buffer_probe(pad, info, data):
     buffer = info.get_buffer()
     current_time = time.perf_counter()
-    print(f"{data} buffer_size: {buffer.get_size()} bytes, time: {current_time}")
+    if False:
+        print(f"{data} buffer_size: {buffer.get_size()} bytes, time: {current_time}")
+    log_buffer_probe(data, buffer.get_size())
     return Gst.PadProbeReturn.OK
 
 def stop_pipeline(mainloop, pipeline):
     print("Stopping pipeline...")
     pipeline.set_state(Gst.State.NULL)
     mainloop.quit()
+
+# The UDP receiver function (runs in a separate thread)
+def ack_receiver():
+    # Create a UDP socket
+    ack_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    # Bind the socket to the address (IP and port) where the acknowledgment will be sent
+    server_address = ('127.0.0.1', 5001)
+    ack_sock.bind(server_address)
+
+    print(f"Listening for acknowledgments on {server_address[0]}:{server_address[1]}")
+
+    while True:
+        # Wait to receive data
+        data, address = ack_sock.recvfrom(4096)
+        
+        # Read the shared dictionary
+        receive_c = shared_dict["receive_count"]
+        latency = shared_dict["latency_class"][receive_c]
+        latency.ack_ts = time.perf_counter()
+        shared_dict["receive_count"] += 1
+        print(latency.__str__())
+        print()
 
 def main():
     # Create the GStreamer pipeline
@@ -60,6 +107,10 @@ def main():
 
     # Set up the main loop
     mainloop = GObject.MainLoop()
+
+    # Start UDP ack receiver thread
+    receiver_thread = threading.Thread(target=ack_receiver, daemon=True)
+    receiver_thread.start()
 
     # Set the pipeline to playing
     pipeline.set_state(Gst.State.PLAYING)
