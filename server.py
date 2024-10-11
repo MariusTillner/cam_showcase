@@ -20,19 +20,21 @@ def stop_pipeline(mainloop, pipeline):
     pipeline.set_state(Gst.State.NULL)
     mainloop.quit()
 
+ack_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+client_address = ('127.0.0.1', 5001) # gstreamer udp socket is 127.0.0.1:5000
+
+def on_new_frame(sink):
+    # Send an acknowledgment packet when a new frame is received
+    print(f"send: {time.perf_counter()}")
+    acknowledgment_message = b'Frame'
+    ack_sock.sendto(acknowledgment_message, client_address)
+
+    # Retrieve the buffer from appsink
+    sample = sink.emit('pull-sample')
+    print(f"sended: {time.perf_counter()}\n")
+    return Gst.FlowReturn.OK
+
 def main():
-    ack_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    client_address = ('127.0.0.1', 5001) # gstreamer udp socket is 127.0.0.1:5000
-
-    def on_new_frame(sink):
-        # Send an acknowledgment packet when a new frame is received
-        acknowledgment_message = b'Frame received'
-        ack_sock.sendto(acknowledgment_message, client_address)
-        print('Acknowledgment sent to client\n')
-
-        # Retrieve the buffer from appsink
-        sample = sink.emit('pull-sample')
-        return Gst.FlowReturn.OK
 
     # Create the GStreamer pipeline
     pipeline = Gst.parse_launch("""
@@ -60,7 +62,7 @@ def main():
     paydeloader_src_pad = paydeloader.get_static_pad("src")
     server_sink_pad = server_sink.get_static_pad("sink")
 
-    if udp_src_pad and True:
+    if udp_src_pad and False:
         udp_src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "udp_src")
     if paydeloader_sink_pad and False:
         paydeloader_sink_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "rtph264depay_sink")
@@ -68,7 +70,7 @@ def main():
         paydeloader_src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "rtph264depay_src")
     if decoder_sink_pad and True:
         decoder_sink_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "decoder_sink")
-    if decoder_src_pad and True:
+    if decoder_src_pad and False:
         decoder_src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "decoder_src")
     if server_sink_pad and True:
         server_sink_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "server_sink")
