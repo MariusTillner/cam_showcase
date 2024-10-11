@@ -14,7 +14,7 @@ from gi.repository import Gst, GObject
 Gst.init(None)
 
 # Shared dictionary and lock
-shared_dict = {"send_count": 0, "receive_count":0, "latency_class": list()}
+shared_dict = {"send_count": 0, "receive_count": 0, "latency_class": list()}
 data_lock = Lock()
 
 def log_buffer_probe(data, buffer_size):
@@ -57,13 +57,14 @@ def ack_receiver():
     while True:
         # Wait to receive data
         data, address = ack_sock.recvfrom(4096)
-        
+
         # Read the shared dictionary
         receive_c = shared_dict["receive_count"]
-        latency = shared_dict["latency_class"][receive_c]
-        latency.ack_ts = time.perf_counter()
+        latency_class = shared_dict["latency_class"][receive_c]
+        latency_class.ack_ts = time.perf_counter()
+        latency_class.server_proc_lat = float(data.decode())
         shared_dict["receive_count"] += 1
-        print(latency.__str__())
+        print(latency_class.__str__())
         print()
 
 def main():
