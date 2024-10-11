@@ -30,4 +30,4 @@ class Latency:
         return 1000*(self.ack_ts - self.raw_buf_ts)
     
     def __str__(self):
-        return f"encoded_size:\t{self.enc_buf_s} bytes,enc_ts:{self.enc_buf_ts}\nSeq_num:\t{self.image_seq_num}\nCompression:\t{self.compression():.0f}\nH264_latency:\t{self.encoding_lat_ms():.3f} ms\nServer_lat:\t{self.server_proc_lat:.3f} ms\nRTT:\t\t{self.network_lat_ms():.3f} ms\nFull_latency:\t{self.full_lat_ms():.3f} ms"
+        return f"encoded_size:\t{self.enc_buf_s} bytes,enc_ts:{self.enc_buf_ts}\nAck_ts:\t\t{self.ack_ts:.3f} ms\nSeq_num:\t{self.image_seq_num}\nCompression:\t{self.compression():.0f}\nH264_latency:\t{self.encoding_lat_ms():.3f} ms\nServer_lat:\t{self.server_proc_lat:.3f} ms\nRTT:\t\t{self.network_lat_ms():.3f} ms\nFull_latency:\t{self.full_lat_ms():.3f} ms"
