@@ -68,6 +68,8 @@ def ack_receiver():
 
 def main():
     # Create the GStreamer pipeline
+    # Speed-preset: ultrafast, superfast, veryfast, faster, fast, medium (default), slow, slower
+    # Tune: fastdecode, zerolatency
     pipeline = Gst.parse_launch("""
         videotestsrc pattern=snow name=src ! video/x-raw,width=1920,height=1080,framerate=30/1 ! 
         videoconvert ! x264enc speed-preset=ultrafast tune=zerolatency name=x264enc ! h264parse ! 
