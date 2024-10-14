@@ -56,7 +56,7 @@ def main():
         udpsrc port=5000 name=udp_src ! application/x-rtp, encoding-name=H264 ! rtph264depay name=rtph264depay ! queue !
         avdec_h264 name=avdec_h264 ! videoconvert ! tee name=t
         t. ! queue ! appsink name=server_sink emit-signals=true
-        t. ! queue ! autovideosink
+        t. ! queue ! autovideosink sync=false
     """)
 
     # Get the encoder and payloader elements
