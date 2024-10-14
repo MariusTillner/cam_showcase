@@ -32,7 +32,7 @@ client_address = ('127.0.0.1', 5001) # gstreamer udp socket is 127.0.0.1:5000
 def on_new_frame(sink):
     # Send an acknowledgment packet when a new frame is received
     # sleep 20 ms to simulate signal processing
-    time.sleep(20/1000)
+    time.sleep(0/1000)
     send_ts = time.perf_counter()
     send_c = rec_send_dict["send_c"]
     receive = rec_send_dict["rec_lst"][send_c]
