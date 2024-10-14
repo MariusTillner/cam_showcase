@@ -5,7 +5,7 @@ import time
 import threading
 from threading import Lock
 import socket
-from Latency import Latency
+from FrameLatency import FrameLatency
 gi.require_version('Gst', '1.0')
 from gi.repository import Gst, GObject
 
@@ -14,7 +14,7 @@ from gi.repository import Gst, GObject
 Gst.init(None)
 
 # Shared dictionary and lock
-shared_dict = {"send_c": 0, "rec_c": 0, "latency_class": list()}
+shared_dict = {"send_c": 0, "rec_c": 0, "frame_latency": list()}
 data_lock = Lock()
 
 # Ack receiver socket
@@ -29,10 +29,10 @@ print(f"Listening for acknowledgments on {server_address[0]}:{server_address[1]}
 def log_buffer_probe(data, buffer_size):
     if data == 'encoder_sink':
         send_c = shared_dict["send_c"]
-        new_lat = Latency(send_c, buffer_size, time.perf_counter())
-        shared_dict["latency_class"].append(new_lat)
+        frame_latency = FrameLatency(send_c, buffer_size, time.perf_counter())
+        shared_dict["frame_latency"].append(frame_latency)
     elif data == 'encoder_src':
-        latency = shared_dict["latency_class"][-1]
+        latency = shared_dict["frame_latency"][-1]
         latency.enc_buf_s = buffer_size
         latency.enc_buf_ts = time.perf_counter()
         shared_dict["send_c"] += 1 # new image is sent, increase counter
@@ -57,17 +57,24 @@ def ack_receiver():
     while True:
         # Wait to receive data
         data, address = ack_sock.recvfrom(4096)
-
-        # Read the shared dictionary
-        rec_c = shared_dict["rec_c"]
-        latency_class = shared_dict["latency_class"][rec_c]
-        latency_class.ack_ts = time.perf_counter()
-        server_proc_lat_ms_str, buf_s_str = data.decode().split(",")
-        latency_class.ack_enc_s = int(buf_s_str)
-        latency_class.server_proc_lat_ms = float(server_proc_lat_ms_str)
+        
+        # Retrieve the current frame's latency information
+        current_frame_index = shared_dict["rec_c"]
+        frame_latency = shared_dict["frame_latency"][current_frame_index]
+        
+        # Update the acknowledgment timestamp
+        frame_latency.ack_ts = time.perf_counter()
+        
+        # Parse the received data
+        server_proc_lat_ms_str, buffer_size_str = data.decode().split(",")
+        frame_latency.ack_enc_s = int(buffer_size_str)
+        frame_latency.server_proc_lat_ms = float(server_proc_lat_ms_str)
+        
+        # Increment the receive counter
         shared_dict["rec_c"] += 1
-        print(latency_class.__str__())
-        print()
+        
+        # Print the frame latency information
+        print(f"{frame_latency}\n")
 
 def main():
     # Create the GStreamer pipeline
