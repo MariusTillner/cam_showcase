@@ -9,15 +9,15 @@ from gi.repository import Gst, GObject
 # Initialize GStreamer
 Gst.init(None)
 
-# save last sink timestamp
-receive_send_dict = {"receive_c": 0, "receive_ts_lst": list(), "send_c": 0}
+# save receive and send data
+rec_send_dict = {"rec_c": 0, "rec_lst": list(), "send_c": 0}
 
 def buffer_probe(pad, info, data):
     buffer = info.get_buffer()
     current_time = time.perf_counter()
     if data == 'decoder_sink':
-        receive_send_dict["receive_ts_lst"].append(time.perf_counter())
-        receive_send_dict["receive_c"] += 1
+        rec_send_dict["rec_lst"].append((time.perf_counter(), buffer.get_size()))
+        rec_send_dict["rec_c"] += 1
     print(f"{data} buffer_size: {buffer.get_size()} bytes, time: {current_time}")
     return Gst.PadProbeReturn.OK
 
@@ -31,21 +31,22 @@ client_address = ('127.0.0.1', 5001) # gstreamer udp socket is 127.0.0.1:5000
 
 def on_new_frame(sink):
     # Send an acknowledgment packet when a new frame is received
-    
     # sleep 20 ms to simulate signal processing
     time.sleep(20/1000)
     send_ts = time.perf_counter()
-    send_c = receive_send_dict["send_c"]
-    receive_ts = receive_send_dict["receive_ts_lst"][send_c]
-    server_proc_latency_ms_str = str(1000*(send_ts - receive_ts))
-    receive_send_dict["send_c"] += 1
+    send_c = rec_send_dict["send_c"]
+    receive = rec_send_dict["rec_lst"][send_c]
+    receive_ts = receive[0]
+    buf_s = receive[1]
+    server_proc_latency_ms = 1000*(send_ts - receive_ts)
+    ack_message = f"{server_proc_latency_ms},{buf_s}"
+    rec_send_dict["send_c"] += 1
     print(f"send: {send_ts}")
-    acknowledgment_message = server_proc_latency_ms_str.encode()
-    ack_sock.sendto(acknowledgment_message, client_address)
+    ack_sock.sendto(ack_message.encode(), client_address)
 
     # Retrieve the buffer from appsink
     sample = sink.emit('pull-sample')
-    print(f"sended: {time.perf_counter()}\n")
+    print(f"sended: {time.perf_counter()}, send_delay: {1000*(time.perf_counter()-send_ts):.3f} ms, rec_c: {rec_send_dict["rec_c"]}, send_c: {rec_send_dict['send_c']}\n")
     return Gst.FlowReturn.OK
 
 def main():

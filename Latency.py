@@ -13,9 +13,10 @@ class Latency:
 
         # timestamp of acknowledgement reception, will be set later
         self.ack_ts = 0
+        self.ack_enc_s = 0
 
         # latency of server decoding and signal processing
-        self.server_proc_lat = 0
+        self.server_proc_lat_ms = 0
 
     def compression(self) -> float:
         return self.raw_buf_s / self.enc_buf_s
@@ -24,10 +25,23 @@ class Latency:
         return 1000*(self.enc_buf_ts - self.raw_buf_ts)
     
     def network_lat_ms(self):
-        return 1000*(self.ack_ts - self.enc_buf_ts)
+        return 1000*(self.ack_ts - self.enc_buf_ts) - self.server_proc_lat_ms
     
     def full_lat_ms(self):
         return 1000*(self.ack_ts - self.raw_buf_ts)
     
     def __str__(self):
-        return f"encoded_size:\t{self.enc_buf_s} bytes,enc_ts:{self.enc_buf_ts}\nAck_ts:\t\t{self.ack_ts:.3f} ms\nSeq_num:\t{self.image_seq_num}\nCompression:\t{self.compression():.0f}\nH264_latency:\t{self.encoding_lat_ms():.3f} ms\nServer_lat:\t{self.server_proc_lat:.3f} ms\nRTT:\t\t{self.network_lat_ms():.3f} ms\nFull_latency:\t{self.full_lat_ms():.3f} ms"
+        return (
+            f"Seq_num:\t{self.image_seq_num}\n"
+            f"raw_ts:\t\t{self.raw_buf_ts:.6f}\n"
+            f"enc_ts:\t\t{self.enc_buf_ts:.6f}\n"
+            f"Ack_ts:\t\t{self.ack_ts:.6f}\n"
+            f"Compression:\t{self.compression():.0f}\n"
+            f"raw_size:\t{self.raw_buf_s} bytes\n"
+            f"encoded_size:\t{self.enc_buf_s} bytes\n"
+            f"ack_buf_size:\t{self.ack_enc_s} bytes\n"
+            f"H264_latency:\t{self.encoding_lat_ms():.3f} ms\n"
+            f"Server_lat:\t{self.server_proc_lat_ms:.3f} ms\n"
+            f"RTT:\t\t{self.network_lat_ms():.3f} ms\n"
+            f"Full_latency:\t{self.full_lat_ms():.3f} ms"
+        )

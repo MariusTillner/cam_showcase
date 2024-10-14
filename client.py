@@ -14,19 +14,28 @@ from gi.repository import Gst, GObject
 Gst.init(None)
 
 # Shared dictionary and lock
-shared_dict = {"send_count": 0, "receive_count": 0, "latency_class": list()}
+shared_dict = {"send_c": 0, "rec_c": 0, "latency_class": list()}
 data_lock = Lock()
+
+# Ack receiver socket
+ack_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+# Bind the socket to the address (IP and port) where the acknowledgment will be sent
+server_address = ('127.0.0.1', 5001)
+ack_sock.bind(server_address)
+print(f"Listening for acknowledgments on {server_address[0]}:{server_address[1]}\n")
+
 
 def log_buffer_probe(data, buffer_size):
     if data == 'encoder_sink':
-        send_c = shared_dict["send_count"]
+        send_c = shared_dict["send_c"]
         new_lat = Latency(send_c, buffer_size, time.perf_counter())
         shared_dict["latency_class"].append(new_lat)
     elif data == 'encoder_src':
         latency = shared_dict["latency_class"][-1]
         latency.enc_buf_s = buffer_size
         latency.enc_buf_ts = time.perf_counter()
-        shared_dict["send_count"] += 1 # new image is sent, increase counter
+        shared_dict["send_c"] += 1 # new image is sent, increase counter
     else:
         pass
 
@@ -45,25 +54,18 @@ def stop_pipeline(mainloop, pipeline):
 
 # The UDP receiver function (runs in a separate thread)
 def ack_receiver():
-    # Create a UDP socket
-    ack_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-    # Bind the socket to the address (IP and port) where the acknowledgment will be sent
-    server_address = ('127.0.0.1', 5001)
-    ack_sock.bind(server_address)
-
-    print(f"Listening for acknowledgments on {server_address[0]}:{server_address[1]}")
-
     while True:
         # Wait to receive data
         data, address = ack_sock.recvfrom(4096)
 
         # Read the shared dictionary
-        receive_c = shared_dict["receive_count"]
-        latency_class = shared_dict["latency_class"][receive_c]
+        rec_c = shared_dict["rec_c"]
+        latency_class = shared_dict["latency_class"][rec_c]
         latency_class.ack_ts = time.perf_counter()
-        latency_class.server_proc_lat = float(data.decode())
-        shared_dict["receive_count"] += 1
+        server_proc_lat_ms_str, buf_s_str = data.decode().split(",")
+        latency_class.ack_enc_s = int(buf_s_str)
+        latency_class.server_proc_lat_ms = float(server_proc_lat_ms_str)
+        shared_dict["rec_c"] += 1
         print(latency_class.__str__())
         print()
 
@@ -117,7 +119,6 @@ def main():
 
     # Set the pipeline to playing
     pipeline.set_state(Gst.State.PLAYING)
-
     # Start the main loop
     try:
         mainloop.run()
