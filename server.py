@@ -10,15 +10,25 @@ from gi.repository import Gst, GObject
 Gst.init(None)
 
 # save receive and send data
-rec_send_dict = {"rec_c": 0, "rec_lst": list(), "send_c": 0}
+rec_send_dict = {"rec_c": 0, "dec_c": 0, "send_c": 0, "rec_lst": list()}
 
 def buffer_probe(pad, info, data):
     buffer = info.get_buffer()
     current_time = time.perf_counter()
+    
     if data == 'decoder_sink':
-        rec_send_dict["rec_lst"].append((time.perf_counter(), buffer.get_size()))
+        rec_dict = {'dec_sink_ts': current_time, 'dec_src_ts': 0, 'buf_s': buffer.get_size()}
+        rec_send_dict["rec_lst"].append(rec_dict)
         rec_send_dict["rec_c"] += 1
-    print(f"{data} buffer_size: {buffer.get_size()} bytes, time: {current_time}")
+    elif data == 'decoder_src':
+        dec_c = rec_send_dict['dec_c']
+        rec_dict = rec_send_dict['rec_lst'][dec_c]
+        rec_dict['dec_src_ts'] = current_time
+        rec_send_dict["dec_c"] += 1
+    
+    if False:
+        print(f"{data} buffer_size: {buffer.get_size()} bytes, time: {current_time}")
+    
     return Gst.PadProbeReturn.OK
 
 def stop_pipeline(mainloop, pipeline):
@@ -30,23 +40,38 @@ ack_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 client_address = ('127.0.0.1', 5001) # gstreamer udp socket is 127.0.0.1:5000
 
 def on_new_frame(sink):
-    # Send an acknowledgment packet when a new frame is received
-    # sleep 20 ms to simulate signal processing
-    time.sleep(0/1000)
-    send_ts = time.perf_counter()
-    send_c = rec_send_dict["send_c"]
-    receive = rec_send_dict["rec_lst"][send_c]
-    receive_ts = receive[0]
-    buf_s = receive[1]
-    server_proc_latency_ms = 1000*(send_ts - receive_ts)
-    ack_message = f"{server_proc_latency_ms},{buf_s}"
-    rec_send_dict["send_c"] += 1
-    print(f"send: {send_ts}")
-    ack_sock.sendto(ack_message.encode(), client_address)
-
     # Retrieve the buffer from appsink
     sample = sink.emit('pull-sample')
-    print(f"sended: {time.perf_counter()}, send_delay: {1000*(time.perf_counter()-send_ts):.3f} ms, rec_c: {rec_send_dict["rec_c"]}, send_c: {rec_send_dict['send_c']}\n")
+    time.sleep(0/1000) # sleep to simulate sample processing
+
+    # Send an acknowledgment packet when a new frame is received
+    send_ts = time.perf_counter()
+    send_c = rec_send_dict["send_c"]
+
+    # Retrieve the corresponding timestamps and buffer size
+    rec_dict = rec_send_dict["rec_lst"][send_c]
+    dec_sink_ts = rec_dict['dec_sink_ts']
+    dec_src_ts = rec_dict['dec_src_ts']
+    buf_s = rec_dict['buf_s']
+
+    # Calculate server latencies in milliseconds
+    dec_lat_ms = 1000 * (dec_src_ts - dec_sink_ts)
+    proc_lat_ms = 1000 * (send_ts - dec_src_ts)
+
+    # Create the acknowledgment message
+    ack_message = f"{dec_lat_ms:.3f},{proc_lat_ms:.3f},{buf_s}"
+
+    # Increment the send counter
+    rec_send_dict["send_c"] += 1
+
+    # Send the acknowledgment message to the client
+    ack_sock.sendto(ack_message.encode(), client_address)
+
+    # Calculate and log the send delay
+    current_time = time.perf_counter()
+    send_delay_ms = 1000 * (current_time - send_ts)
+    print(f"sended: {current_time:.6f}, send_delay: {send_delay_ms:.3f} ms, rec_seq_num: {rec_send_dict['rec_c']}, send_seq_num: {rec_send_dict['send_c']}\n")
+
     return Gst.FlowReturn.OK
 
 def main():
@@ -54,7 +79,7 @@ def main():
     # Create the GStreamer pipeline
     pipeline = Gst.parse_launch("""
         udpsrc port=5000 name=udp_src ! application/x-rtp, encoding-name=H264 ! rtph264depay name=rtph264depay ! queue !
-        avdec_h264 name=avdec_h264 ! videoconvert ! tee name=t
+        avdec_h264 name=avdec_h264 ! queue ! videoconvert ! tee name=t
         t. ! queue ! appsink name=server_sink emit-signals=true
         t. ! queue ! autovideosink sync=false
     """)
@@ -65,8 +90,20 @@ def main():
     paydeloader = pipeline.get_by_name("rtph264depay")
     server_sink = pipeline.get_by_name("server_sink")
 
-    if not udp_src or not decoder or not paydeloader or not server_sink:
-        print("Elements not found.")
+    if not udp_src:
+        print("udp_src not found.")
+        sys.exit(1)
+
+    if not decoder:
+        print("decoder not found.")
+        sys.exit(1)
+
+    if not paydeloader:
+        print("paydeloader not found.")
+        sys.exit(1)
+
+    if not server_sink:
+        print("server_sink not found.")
         sys.exit(1)
 
     # Add buffer probes

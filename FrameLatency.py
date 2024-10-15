@@ -17,6 +17,7 @@ class FrameLatency:
 
         # latency of server decoding and signal processing
         self.server_proc_lat_ms = 0
+        self.server_dec_lat_ms = 0
 
     def compression(self) -> float:
         return self.raw_buf_s / self.enc_buf_s
@@ -32,16 +33,17 @@ class FrameLatency:
 
     def __str__(self):
         return (
-            f"Seq_num:\t{self.image_seq_num}\n"
-            f"raw_ts:\t\t{self.raw_buf_ts:.6f}\n"
-            f"enc_ts:\t\t{self.enc_buf_ts:.6f}\n"
-            f"Ack_ts:\t\t{self.ack_ts:.6f}\n"
-            f"Compression:\t{self.compression():.0f}\n"
-            f"raw_size:\t{self.raw_buf_s} bytes\n"
-            f"encoded_size:\t{self.enc_buf_s} bytes\n"
-            f"ack_buf_size:\t{self.ack_enc_s} bytes\n"
-            f"H264_latency:\t{self.encoding_lat_ms():.3f} ms\n"
-            f"Server_lat:\t{self.server_proc_lat_ms:.3f} ms\n"
-            f"RTT:\t\t{self.network_lat_ms():.3f} ms\n"
-            f"Full_latency:\t{self.full_lat_ms():.3f} ms"
+            f"Seq_num:\t\t{self.image_seq_num}\n"
+            f"raw_ts:\t\t\t{self.raw_buf_ts:.6f}\n"
+            f"enc_ts:\t\t\t{self.enc_buf_ts:.6f}\n"
+            f"Ack_ts:\t\t\t{self.ack_ts:.6f}\n"
+            f"Compression:\t\t{self.compression():.0f}\n"
+            f"raw_size:\t\t{self.raw_buf_s} bytes\n"
+            f"encoded_size:\t\t{self.enc_buf_s} bytes\n"
+            f"ack_buf_size:\t\t{self.ack_enc_s} bytes\n"
+            f"Encoding:\t\t{self.encoding_lat_ms():.3f} ms\n"
+            f"Decoding:\t\t{self.server_dec_lat_ms:.3f} ms\n"
+            f"Server_proc:\t\t{self.server_proc_lat_ms:.3f} ms\n"
+            f"Network_RTT:\t\t{self.network_lat_ms():.3f} ms\n"
+            f"Full_RTT:\t\t{self.full_lat_ms():.3f} ms"
         )

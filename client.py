@@ -66,9 +66,10 @@ def ack_receiver():
         frame_latency.ack_ts = time.perf_counter()
         
         # Parse the received data
-        server_proc_lat_ms_str, buffer_size_str = data.decode().split(",")
+        server_dec_lat_ms_str, server_proc_lat_ms_str, buffer_size_str = data.decode().split(",")
         frame_latency.ack_enc_s = int(buffer_size_str)
         frame_latency.server_proc_lat_ms = float(server_proc_lat_ms_str)
+        frame_latency.server_dec_lat_ms = float(server_dec_lat_ms_str)
         
         # Increment the receive counter
         shared_dict["rec_c"] += 1
@@ -92,8 +93,20 @@ def main():
     payloader = pipeline.get_by_name("rtph264pay")
     udp = pipeline.get_by_name("udp")
 
-    if not src or not encoder or not payloader or not udp:
-        print("Elements not found.")
+    if not src:
+        print("src not found.")
+        sys.exit(1)
+
+    if not encoder:
+        print("encoder not found.")
+        sys.exit(1)
+
+    if not payloader:
+        print("payloader not found.")
+        sys.exit(1)
+
+    if not udp:
+        print("udp not found.")
         sys.exit(1)
 
     # Add buffer probes
