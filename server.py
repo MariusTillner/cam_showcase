@@ -78,7 +78,8 @@ def main():
 
     # Create the GStreamer pipeline
     pipeline = Gst.parse_launch("""
-        udpsrc port=5000 name=udp_src ! application/x-rtp, encoding-name=H264 ! rtph264depay name=rtph264depay ! queue !
+        udpsrc port=5000 name=udp_src ! 
+        application/x-rtp, encoding-name=H264 ! rtph264depay name=rtph264depay ! queue ! 
         avdec_h264 name=avdec_h264 ! queue ! videoconvert ! tee name=t
         t. ! queue ! appsink name=server_sink emit-signals=true
         t. ! queue ! autovideosink sync=false

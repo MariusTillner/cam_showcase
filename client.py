@@ -82,9 +82,11 @@ def main():
     # Speed-preset: ultrafast, superfast, veryfast, faster, fast, medium (default), slow, slower
     # Tune: fastdecode, zerolatency
     pipeline = Gst.parse_launch("""
-        videotestsrc pattern=snow name=src ! video/x-raw,width=1920,height=1080,framerate=30/1 ! 
+        videotestsrc pattern=snow name=src ! 
+        video/x-raw,width=1920,height=1080,framerate=30/1 ! 
         videoconvert ! x264enc speed-preset=ultrafast tune=zerolatency name=x264enc ! h264parse ! 
-        rtph264pay config-interval=1 name=rtph264pay ! udpsink host=127.0.0.1 port=5000 sync=false async=false name=udp
+        rtph264pay config-interval=1 name=rtph264pay ! 
+        udpsink host=127.0.0.1 port=5000 sync=false async=false name=udp
     """)
 
     # Get the encoder and payloader elements
