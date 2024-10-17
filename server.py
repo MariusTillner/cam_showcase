@@ -10,7 +10,7 @@ from gi.repository import Gst, GObject
 Gst.init(None)
 
 # save receive and send data
-rec_send_dict = {"rec_c": 0, "dec_c": 0, "send_c": 0, "rec_lst": list()}
+latency_data = {"rec_c": 0, "dec_c": 0, "send_c": 0, "rec_lst": list()}
 
 def buffer_probe(pad, info, data):
     buffer = info.get_buffer()
@@ -18,13 +18,13 @@ def buffer_probe(pad, info, data):
     
     if data == 'decoder_sink':
         rec_dict = {'dec_sink_ts': current_time, 'dec_src_ts': 0, 'buf_s': buffer.get_size()}
-        rec_send_dict["rec_lst"].append(rec_dict)
-        rec_send_dict["rec_c"] += 1
+        latency_data["rec_lst"].append(rec_dict)
+        latency_data["rec_c"] += 1
     elif data == 'decoder_src':
-        dec_c = rec_send_dict['dec_c']
-        rec_dict = rec_send_dict['rec_lst'][dec_c]
+        dec_c = latency_data['dec_c']
+        rec_dict = latency_data['rec_lst'][dec_c]
         rec_dict['dec_src_ts'] = current_time
-        rec_send_dict["dec_c"] += 1
+        latency_data["dec_c"] += 1
     
     if False:
         print(f"{data} buffer_size: {buffer.get_size()} bytes, time: {current_time}")
@@ -46,10 +46,10 @@ def on_new_frame(sink):
 
     # Send an acknowledgment packet when a new frame is received
     send_ts = time.perf_counter()
-    send_c = rec_send_dict["send_c"]
+    send_c = latency_data["send_c"]
 
     # Retrieve the corresponding timestamps and buffer size
-    rec_dict = rec_send_dict["rec_lst"][send_c]
+    rec_dict = latency_data["rec_lst"][send_c]
     dec_sink_ts = rec_dict['dec_sink_ts']
     dec_src_ts = rec_dict['dec_src_ts']
     buf_s = rec_dict['buf_s']
@@ -62,7 +62,7 @@ def on_new_frame(sink):
     ack_message = f"{dec_lat_ms:.3f},{proc_lat_ms:.3f},{buf_s}"
 
     # Increment the send counter
-    rec_send_dict["send_c"] += 1
+    latency_data["send_c"] += 1
 
     # Send the acknowledgment message to the client
     ack_sock.sendto(ack_message.encode(), client_address)
@@ -70,7 +70,7 @@ def on_new_frame(sink):
     # Calculate and log the send delay
     current_time = time.perf_counter()
     send_delay_ms = 1000 * (current_time - send_ts)
-    print(f"sended: {current_time:.6f}, send_delay: {send_delay_ms:.3f} ms, rec_seq_num: {rec_send_dict['rec_c']}, send_seq_num: {rec_send_dict['send_c']}\n")
+    print(f"sended: {current_time:.6f}, send_delay: {send_delay_ms:.3f} ms, rec_seq_num: {latency_data['rec_c']}, send_seq_num: {latency_data['send_c']}\n")
 
     return Gst.FlowReturn.OK
 
