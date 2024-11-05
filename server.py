@@ -6,12 +6,27 @@ import socket
 gi.require_version('Gst', '1.0')
 from gi.repository import Gst, GObject
 
+
+####################################
+######### Global Variables #########
+####################################
 # Initialize GStreamer
 Gst.init(None)
 
 # save receive and send data
 latency_data = {"rec_c": 0, "dec_c": 0, "send_c": 0, "rec_lst": list()}
 
+# set up acknowledgment socket
+ack_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+server_address = ("127.0.0.1", 5001)
+ack_sock.bind(server_address)
+client_address = None # Will be set after receiving the initial message from client
+print(f"Server Socket is listening on {server_address}")
+
+
+#############################
+######### FUNCTIONS #########
+#############################
 def buffer_probe(pad, info, data):
     buffer = info.get_buffer()
     current_time = time.perf_counter()
@@ -36,13 +51,10 @@ def stop_pipeline(mainloop, pipeline):
     pipeline.set_state(Gst.State.NULL)
     mainloop.quit()
 
-ack_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-client_address = ('127.0.0.1', 5001) # gstreamer udp socket is 127.0.0.1:5000
-
 def on_new_frame(sink):
     # Retrieve the buffer from appsink
     sample = sink.emit('pull-sample')
-    time.sleep(0/1000) # sleep to simulate sample processing
+    time.sleep(10/1000) # sleep to simulate sample processing
 
     # Send an acknowledgment packet when a new frame is received
     send_ts = time.perf_counter()
@@ -75,7 +87,6 @@ def on_new_frame(sink):
     return Gst.FlowReturn.OK
 
 def main():
-
     # Create the GStreamer pipeline
     pipeline = Gst.parse_launch("""
         udpsrc port=5000 name=udp_src ! 
@@ -133,6 +144,17 @@ def main():
 
     # Set up the main loop
     mainloop = GObject.MainLoop()
+
+    # wait for initial message from client
+    print("Waiting for initial Client message")
+    global client_address
+    init_message, client_address = ack_sock.recvfrom(1024)
+    if init_message.decode() == 'init':
+        print(f"Init message from client {client_address} successfully received, sent back ack message and start GStreamer pipeline...")
+        ack_sock.sendto(b'ack', client_address)
+    else:
+        print(f"Wrong init message {init_message.decode()}, should be \"init\", from {client_address}, abort...")
+        return
 
     # Set the pipeline to playing
     pipeline.set_state(Gst.State.PLAYING)

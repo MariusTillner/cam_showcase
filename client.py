@@ -10,22 +10,23 @@ gi.require_version('Gst', '1.0')
 from gi.repository import Gst, GObject
 
 
+####################################
+######### Global Variables #########
+####################################
 # Initialize GStreamer
 Gst.init(None)
 
 # Shared dictionary and lock
 shared_dict = {"send_c": 0, "rec_c": 0, "frame_latency": list()}
-data_lock = Lock()
 
 # Ack receiver socket
+server_address = ('127.0.0.1', 5001)
 ack_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-# Bind the socket to the address (IP and port) where the acknowledgment will be sent
-server_address = ('127.0.0.1', 5001)
-ack_sock.bind(server_address)
-print(f"Listening for acknowledgments on {server_address[0]}:{server_address[1]}\n")
 
-
+#############################
+######### FUNCTIONS #########
+#############################
 def log_buffer_probe(data, buffer_size):
     if data == 'encoder_sink':
         send_c = shared_dict["send_c"]
@@ -53,10 +54,10 @@ def stop_pipeline(mainloop, pipeline):
     mainloop.quit()
 
 # The UDP receiver function (runs in a separate thread)
-def ack_receiver():
+def ack_receiver_function():
     while True:
         # Wait to receive data
-        data, address = ack_sock.recvfrom(4096)
+        data, _ = ack_sock.recvfrom(4096)
         
         # Retrieve the current frame's latency information
         current_frame_index = shared_dict["rec_c"]
@@ -135,8 +136,16 @@ def main():
     # Set up the main loop
     mainloop = GObject.MainLoop()
 
+    # send initial message to server, so server knows which ip to answer to
+    ack_sock.sendto(b'init', server_address)
+    print("Sent initial message to Server")
+
+    # receive initial message acknowledgment, this makes sure the network connection is working
+    ack_message, _ = ack_sock.recvfrom(1024)
+    print(f"Received ack message from Server ({ack_message.decode()}), Network connection works, start GStreamer pipeline...")
+
     # Start UDP ack receiver thread
-    receiver_thread = threading.Thread(target=ack_receiver, daemon=True)
+    receiver_thread = threading.Thread(target=ack_receiver_function, daemon=True)
     receiver_thread.start()
 
     # Set the pipeline to playing
