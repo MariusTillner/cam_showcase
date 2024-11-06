@@ -29,7 +29,7 @@ rec_ts = 0
 shared_dict = {}
 
 # Ack receiver socket
-server_address = ('127.0.0.1', 5001)
+server_address = ('192.168.70.129', 5001)
 ack_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 
@@ -133,7 +133,7 @@ def main():
         x264enc speed-preset=ultrafast tune=zerolatency name=x264enc ! 
         h264parse ! 
         rtph264pay config-interval=1 name=rtph264pay ! 
-        udpsink host=127.0.0.1 port=5000 sync=false async=false name=udp
+        udpsink host=192.168.70.129 port=5000 sync=false async=false name=udp
     """)
 
     # add all buffer probes for measuring latency and logging infos
