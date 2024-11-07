@@ -20,7 +20,12 @@ class FrameLatency:
         self.server_dec_lat_ms = 0
 
     def compression(self) -> float:
-        return self.raw_buf_s / self.enc_buf_s
+        try:
+            compression = self.raw_buf_s / self.enc_buf_s
+        except:
+            compression = -1
+
+        return compression
 
     def encoding_lat_ms(self):
         return 1000*(self.enc_buf_ts - self.raw_buf_ts)
