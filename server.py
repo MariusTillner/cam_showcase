@@ -82,7 +82,7 @@ def on_new_frame(sink):
     # Calculate and log the send delay
     current_time = time.perf_counter()
     send_delay_ms = 1000 * (current_time - send_ts)
-    print(f"sended: {current_time:.6f}, send_delay: {send_delay_ms:.3f} ms, rec_seq_num: {latency_data['rec_c']}, send_seq_num: {latency_data['send_c']}\n")
+    print(f"sended: {current_time:.6f}, send_delay: {send_delay_ms:.3f} ms, rec_seq_num: {latency_data['rec_c']}, send_seq_num: {latency_data['send_c'] - 1}\n")
 
     return Gst.FlowReturn.OK
 
