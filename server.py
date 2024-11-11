@@ -71,7 +71,7 @@ def on_new_frame(sink):
     proc_lat_ms = 1000 * (send_ts - dec_src_ts)
 
     # Create the acknowledgment message
-    ack_message = f"{dec_lat_ms:.3f},{proc_lat_ms:.3f},{buf_s}"
+    ack_message = f"{send_c},{dec_lat_ms:.3f},{proc_lat_ms:.3f},{buf_s}"
 
     # Increment the send counter
     latency_data["send_c"] += 1
@@ -82,7 +82,7 @@ def on_new_frame(sink):
     # Calculate and log the send delay
     current_time = time.perf_counter()
     send_delay_ms = 1000 * (current_time - send_ts)
-    print(f"sended: {current_time:.6f}, send_delay: {send_delay_ms:.3f} ms, rec_seq_num: {latency_data['rec_c']}, send_seq_num: {latency_data['send_c'] - 1}\n")
+    print(f"sended: {current_time:.6f}, send_delay: {send_delay_ms:.3f} ms, rec_seq_num: {latency_data['rec_c']}, send_seq_num: {send_c}\n")
 
     return Gst.FlowReturn.OK
 

@@ -56,18 +56,18 @@ def stop_pipeline(mainloop, pipeline):
 # The UDP receiver function (runs in a separate thread)
 def ack_receiver_function():
     while True:
-        # Wait to receive data
+        # Wait to receive data, and then decode it
         data, _ = ack_sock.recvfrom(4096)
+        rec_seq_num, server_dec_lat_ms_str, server_proc_lat_ms_str, buffer_size_str = data.decode().split(",")
+        rec_seq_num = int(rec_seq_num) # string to int
         
         # Retrieve the current frame's latency information
-        current_frame_index = shared_dict["rec_c"]
-        frame_latency = shared_dict["frame_latency"][current_frame_index]
+        frame_latency = shared_dict["frame_latency"][rec_seq_num]
         
         # Update the acknowledgment timestamp
         frame_latency.ack_ts = time.perf_counter()
         
-        # Parse the received data
-        server_dec_lat_ms_str, server_proc_lat_ms_str, buffer_size_str = data.decode().split(",")
+        # decode the rest of the received data and fill the FrameLatency class with its data
         frame_latency.ack_enc_s = int(buffer_size_str)
         frame_latency.server_proc_lat_ms = float(server_proc_lat_ms_str)
         frame_latency.server_dec_lat_ms = float(server_dec_lat_ms_str)
