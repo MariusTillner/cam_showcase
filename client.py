@@ -159,6 +159,9 @@ def main():
     ack_message, _ = ack_sock.recvfrom(1024)
     print(f"Received ack message from Server ({ack_message.decode()}), Network connection works, start GStreamer pipeline...")
 
+    # wait one second to give server enough time to set itself up
+    time.sleep(1)
+
     # Start UDP ack receiver thread
     receiver_thread = threading.Thread(target=ack_receiver_function, daemon=True)
     receiver_thread.start()
