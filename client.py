@@ -16,8 +16,13 @@ from gi.repository import Gst, GObject
 # Initialize GStreamer
 Gst.init(None)
 
-# Shared dictionary and lock
-shared_dict = {"send_c": 0, "rec_c": 0, "frame_latency": list()}
+# Shared dictionary and global sequence numbers
+raw_seqn = 0    # global raw sequence number that counts the appearing raw frames
+enc_seqn = 0    # global ecoded sequence number that counts the encoded frames
+rec_seqn = 0    # global receive sequence number that counts the receive frames
+
+# shared dict that will save the FrameLatency instances that will track the different latencies of a frame
+shared_dict = {}
 
 # Ack receiver socket
 server_address = ('127.0.0.1', 5001)
@@ -29,14 +34,16 @@ ack_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 #############################
 def log_buffer_probe(data, buffer_size):
     if data == 'encoder_sink':
-        send_c = shared_dict["send_c"]
-        frame_latency = FrameLatency(send_c, buffer_size, time.perf_counter())
-        shared_dict["frame_latency"].append(frame_latency)
+        global raw_seqn
+        frame_latency = FrameLatency(raw_seqn, buffer_size, time.perf_counter())
+        shared_dict[raw_seqn] = frame_latency
+        raw_seqn += 1
     elif data == 'encoder_src':
-        latency = shared_dict["frame_latency"][-1]
-        latency.enc_buf_s = buffer_size
-        latency.enc_buf_ts = time.perf_counter()
-        shared_dict["send_c"] += 1 # new image is sent, increase counter
+        global enc_seqn
+        frame_latency = shared_dict[enc_seqn]
+        frame_latency.enc_buf_s = buffer_size
+        frame_latency.enc_buf_ts = time.perf_counter()
+        enc_seqn += 1
     else:
         pass
 
@@ -58,11 +65,16 @@ def ack_receiver_function():
     while True:
         # Wait to receive data, and then decode it
         data, _ = ack_sock.recvfrom(4096)
-        rec_seq_num, server_dec_lat_ms_str, server_proc_lat_ms_str, buffer_size_str = data.decode().split(",")
-        rec_seq_num = int(rec_seq_num) # string to int
+        server_rec_seqn, server_dec_lat_ms_str, server_proc_lat_ms_str, buffer_size_str = data.decode().split(",")
+        server_rec_seqn = int(server_rec_seqn) # string to int
+
+        # check if there is a mismatch of received sequence number of server and client sequence number
+        global rec_seqn
+        if server_rec_seqn != rec_seqn:
+            raise Exception(f"server_rec_seqn: {server_rec_seqn} does not match rec_seqn: {rec_seqn}")
         
         # Retrieve the current frame's latency information
-        frame_latency = shared_dict["frame_latency"][rec_seq_num]
+        frame_latency = shared_dict[server_rec_seqn]
         
         # Update the acknowledgment timestamp
         frame_latency.ack_ts = time.perf_counter()
@@ -72,11 +84,11 @@ def ack_receiver_function():
         frame_latency.server_proc_lat_ms = float(server_proc_lat_ms_str)
         frame_latency.server_dec_lat_ms = float(server_dec_lat_ms_str)
         
-        # Increment the receive counter
-        shared_dict["rec_c"] += 1
-        
         # Print the frame latency information
         print(f"{frame_latency}\n")
+
+        # increase local receive sequence number
+        rec_seqn += 1
 
 def main():
     # Create the GStreamer pipeline
