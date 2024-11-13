@@ -59,7 +59,8 @@ def stop_pipeline(mainloop, pipeline):
 def on_new_frame(sink):
     # Retrieve the buffer from appsink
     sample = sink.emit('pull-sample')
-    time.sleep(10/1000) # sleep to simulate sample processing
+    print(sample)
+    time.sleep(0/1000) # sleep to simulate sample processing
 
     # Send an acknowledgment packet when a new frame is received
     send_ts = time.perf_counter()
@@ -97,11 +98,15 @@ def on_new_frame(sink):
 def main():
     # Create the GStreamer pipeline
     pipeline = Gst.parse_launch("""
-        udpsrc port=5000 name=udp_src ! 
-        application/x-rtp, encoding-name=H264 ! rtph264depay name=rtph264depay ! queue ! 
-        avdec_h264 name=avdec_h264 ! queue ! videoconvert ! tee name=t
-        t. ! queue ! appsink name=server_sink emit-signals=true
-        t. ! queue ! autovideosink sync=false
+    udpsrc port=5000 name=udp_src ! 
+    application/x-rtp, encoding-name=H264 ! 
+    rtph264depay name=rtph264depay ! 
+    queue ! 
+    avdec_h264 name=avdec_h264 ! 
+    queue ! 
+    tee name=t
+    t. ! queue ! appsink name=server_sink emit-signals=true sync=false drop=true
+    t. ! queue ! videoconvert ! autovideosink
     """)
 
     # Get the encoder and payloader elements

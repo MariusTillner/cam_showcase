@@ -95,9 +95,11 @@ def main():
     # Speed-preset: ultrafast, superfast, veryfast, faster, fast, medium (default), slow, slower
     # Tune: fastdecode, zerolatency
     pipeline = Gst.parse_launch("""
-        videotestsrc pattern=snow name=src ! 
-        video/x-raw,width=1080,height=720,framerate=30/1 ! 
-        videoconvert ! x264enc speed-preset=ultrafast tune=zerolatency name=x264enc ! h264parse ! 
+        vmbsrc camera=DEV_000A47000430 settingsfile=/home/pi/marius/camsettings_showcase.xml name=src ! 
+        queue ! 
+        videoconvert ! 
+        x264enc speed-preset=ultrafast tune=zerolatency name=x264enc ! 
+        h264parse ! 
         rtph264pay config-interval=1 name=rtph264pay ! 
         udpsink host=127.0.0.1 port=5000 sync=false async=false name=udp
     """)
