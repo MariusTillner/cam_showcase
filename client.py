@@ -7,7 +7,7 @@ from threading import Lock
 import socket
 from FrameLatency import FrameLatency
 gi.require_version('Gst', '1.0')
-from gi.repository import Gst, GObject
+from gi.repository import Gst, GLib
 
 
 ####################################
@@ -146,7 +146,7 @@ def main():
         udp_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "udp")
 
     # Set up the main loop
-    mainloop = GObject.MainLoop()
+    mainloop = GLib.MainLoop()
 
     # send initial message to server, so server knows which ip to answer to
     ack_sock.sendto(b'init', server_address)

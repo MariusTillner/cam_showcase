@@ -4,7 +4,7 @@ import sys
 import time
 import socket
 gi.require_version('Gst', '1.0')
-from gi.repository import Gst, GObject
+from gi.repository import Gst, GLib
 
 
 ####################################
@@ -151,7 +151,7 @@ def main():
     server_sink.connect('new-sample', on_new_frame)
 
     # Set up the main loop
-    mainloop = GObject.MainLoop()
+    mainloop = GLib.MainLoop()
 
     # wait for initial message from client
     print("Waiting for initial Client message")
