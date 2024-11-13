@@ -71,7 +71,7 @@ def ack_receiver_function():
         # check if there is a mismatch of received sequence number of server and client sequence number
         global rec_seqn
         if server_rec_seqn != rec_seqn:
-            raise Exception(f"server_rec_seqn: {server_rec_seqn} does not match rec_seqn: {rec_seqn}")
+            print(f"server_rec_seqn: {server_rec_seqn} does not match rec_seqn: {rec_seqn}")
         
         # Retrieve the current frame's latency information
         frame_latency = shared_dict[server_rec_seqn]
@@ -95,7 +95,8 @@ def main():
     # Speed-preset: ultrafast, superfast, veryfast, faster, fast, medium (default), slow, slower
     # Tune: fastdecode, zerolatency
     pipeline = Gst.parse_launch("""
-        vmbsrc camera=DEV_000A47000430 settingsfile=/home/pi/marius/camsettings_showcase.xml name=src ! 
+        videotestsrc pattern=snow name=src ! 
+        video/x-raw,width=1080,height=720,framerate=30/1 ! 
         queue ! 
         videoconvert ! 
         x264enc speed-preset=ultrafast tune=zerolatency name=x264enc ! 

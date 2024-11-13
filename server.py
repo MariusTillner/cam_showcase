@@ -59,7 +59,6 @@ def stop_pipeline(mainloop, pipeline):
 def on_new_frame(sink):
     # Retrieve the buffer from appsink
     sample = sink.emit('pull-sample')
-    print(sample)
     time.sleep(0/1000) # sleep to simulate sample processing
 
     # Send an acknowledgment packet when a new frame is received
