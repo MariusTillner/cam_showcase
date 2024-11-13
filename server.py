@@ -13,8 +13,13 @@ from gi.repository import Gst, GObject
 # Initialize GStreamer
 Gst.init(None)
 
-# save receive and send data
-latency_data = {"rec_c": 0, "dec_c": 0, "send_c": 0, "rec_lst": list()}
+# Global sequence numbers
+rec_seqn = 0    # global receive sequence number that counts and labels received encoded frames
+dec_seqn = 0    # global decoded sequence number that counts and labels decoded frames
+send_seqn = 0   # global send sequence number that counts how the acknowledgment packets
+
+# Dict that will save the latencies of received frames, latency data will be saved as dict
+shared_dict = {}
 
 # set up acknowledgment socket
 ack_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -33,14 +38,14 @@ def buffer_probe(pad, info, data):
     
     if data == 'decoder_sink':
         rec_dict = {'dec_sink_ts': current_time, 'dec_src_ts': 0, 'buf_s': buffer.get_size()}
-        latency_data["rec_lst"].append(rec_dict)
-        latency_data["rec_c"] += 1
+        global rec_seqn
+        shared_dict[rec_seqn] = rec_dict
+        rec_seqn += 1
     elif data == 'decoder_src':
-        dec_c = latency_data['dec_c']
-        rec_dict = latency_data['rec_lst'][dec_c]
+        global dec_seqn
+        rec_dict = shared_dict[dec_seqn]
         rec_dict['dec_src_ts'] = current_time
-        latency_data["dec_c"] += 1
-    
+        dec_seqn += 1
     if False:
         print(f"{data} buffer_size: {buffer.get_size()} bytes, time: {current_time}")
     
@@ -58,10 +63,10 @@ def on_new_frame(sink):
 
     # Send an acknowledgment packet when a new frame is received
     send_ts = time.perf_counter()
-    send_c = latency_data["send_c"]
 
     # Retrieve the corresponding timestamps and buffer size
-    rec_dict = latency_data["rec_lst"][send_c]
+    global send_seqn
+    rec_dict = shared_dict[send_seqn]
     dec_sink_ts = rec_dict['dec_sink_ts']
     dec_src_ts = rec_dict['dec_src_ts']
     buf_s = rec_dict['buf_s']
@@ -71,10 +76,10 @@ def on_new_frame(sink):
     proc_lat_ms = 1000 * (send_ts - dec_src_ts)
 
     # Create the acknowledgment message
-    ack_message = f"{send_c},{dec_lat_ms:.3f},{proc_lat_ms:.3f},{buf_s}"
+    ack_message = f"{send_seqn},{dec_lat_ms:.3f},{proc_lat_ms:.3f},{buf_s}"
 
     # Increment the send counter
-    latency_data["send_c"] += 1
+    send_seqn += 1
 
     # Send the acknowledgment message to the client
     ack_sock.sendto(ack_message.encode(), client_address)
@@ -82,7 +87,10 @@ def on_new_frame(sink):
     # Calculate and log the send delay
     current_time = time.perf_counter()
     send_delay_ms = 1000 * (current_time - send_ts)
-    print(f"sended: {current_time:.6f}, send_delay: {send_delay_ms:.3f} ms, rec_seq_num: {latency_data['rec_c']}, send_seq_num: {send_c}\n")
+
+    # print status
+    global rec_seqn
+    print(f"sended: {current_time:.6f}, send_delay: {send_delay_ms:.3f} ms, rec_seq_num: {rec_seqn}, send_seq_num: {send_seqn - 1}\n")
 
     return Gst.FlowReturn.OK
 

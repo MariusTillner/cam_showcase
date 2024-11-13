@@ -16,7 +16,7 @@ from gi.repository import Gst, GObject
 # Initialize GStreamer
 Gst.init(None)
 
-# Shared dictionary and global sequence numbers
+# Global sequence numbers
 raw_seqn = 0    # global raw sequence number that counts the appearing raw frames
 enc_seqn = 0    # global ecoded sequence number that counts the encoded frames
 rec_seqn = 0    # global receive sequence number that counts the receive frames
