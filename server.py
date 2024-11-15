@@ -14,9 +14,9 @@ from gi.repository import Gst, GLib
 Gst.init(None)
 
 # Global sequence numbers
-rec_seqn = 0    # global receive sequence number that counts and labels received encoded frames
-dec_seqn = 0    # global decoded sequence number that counts and labels decoded frames
-send_seqn = 0   # global send sequence number that counts how the acknowledgment packets
+rec_seqn = -1    # global receive sequence number that counts and labels received encoded frames
+dec_seqn = -1    # global decoded sequence number that counts and labels decoded frames
+send_seqn = -1   # global send sequence number that counts how the acknowledgment packets
 
 # Dict that will save the latencies of received frames, latency data will be saved as dict
 shared_dict = {}
@@ -36,19 +36,18 @@ def buffer_probe(pad, info, data):
     buffer = info.get_buffer()
     current_time = time.perf_counter()
     
-    if data == 'decoder_sink':
-        rec_dict = {'dec_sink_ts': current_time, 'dec_src_ts': 0, 'buf_s': buffer.get_size()}
+    if data == 'decoder_in':
         global rec_seqn
-        shared_dict[rec_seqn] = rec_dict
         rec_seqn += 1
-    elif data == 'decoder_src':
+        rec_dict = {'dec_sink_ts': current_time, 'dec_src_ts': 0, 'buf_s': buffer.get_size()}
+        print(f"{data}, rec_seqn: {rec_seqn}, buffer_size: {buffer.get_size()} bytes, time: {current_time}")
+        shared_dict[rec_seqn] = rec_dict
+    elif data == 'decoder_out':
         global dec_seqn
-        rec_dict = shared_dict[dec_seqn]
-        rec_dict['dec_src_ts'] = current_time
         dec_seqn += 1
-    if True:
-        print(f"{data} buffer_size: {buffer.get_size()} bytes, time: {current_time}")
-    
+        rec_dict = shared_dict[dec_seqn]
+        print(f"{data}, dec_seqn: {dec_seqn}, buffer_size: {buffer.get_size()} bytes, time: {current_time}")
+        rec_dict['dec_src_ts'] = current_time
     return Gst.PadProbeReturn.OK
 
 def stop_pipeline(mainloop, pipeline):
@@ -57,6 +56,11 @@ def stop_pipeline(mainloop, pipeline):
     mainloop.quit()
 
 def on_new_frame(sink):
+    # Increment the send counter
+    global send_seqn
+    send_seqn += 1
+    print(f"on_new_frame, send_seqn: {send_seqn}, time: {time.perf_counter()}")
+
     # Retrieve the buffer from appsink
     sample = sink.emit('pull-sample')
     time.sleep(0/1000) # sleep to simulate sample processing
@@ -65,7 +69,6 @@ def on_new_frame(sink):
     send_ts = time.perf_counter()
 
     # Retrieve the corresponding timestamps and buffer size
-    global send_seqn
     rec_dict = shared_dict[send_seqn]
     dec_sink_ts = rec_dict['dec_sink_ts']
     dec_src_ts = rec_dict['dec_src_ts']
@@ -78,9 +81,6 @@ def on_new_frame(sink):
     # Create the acknowledgment message
     ack_message = f"{send_seqn},{dec_lat_ms:.3f},{proc_lat_ms:.3f},{buf_s}"
 
-    # Increment the send counter
-    send_seqn += 1
-
     # Send the acknowledgment message to the client
     ack_sock.sendto(ack_message.encode(), client_address)
 
@@ -92,9 +92,10 @@ def on_new_frame(sink):
     global rec_seqn
     global dec_seqn
     print(f"""
+    current time: {current_time}
     rec_seqn: {rec_seqn}
-    dec_seqn: {dec_seqn}\tdec_lat_ms: {dec_lat_ms:.3f}
-    send_seqn: {send_seqn - 1}\tproc_lat : {proc_lat_ms:.3f} ms, send_delay: {send_delay_us:.1f} us
+    dec_seqn: {dec_seqn}\tdec_lat: {dec_lat_ms:.3f} ms
+    send_sqn: {send_seqn}\tprc_lat: {proc_lat_ms:.3f} ms, send_delay: {send_delay_us:.1f} us
     Total lat:\t\t{1000*(current_time - dec_sink_ts):.3f} ms
     """)
     #print(f"sended: {current_time:.6f}, send_delay: {send_delay_ms:.3f} ms, rec_seq_num: {rec_seqn}, send_seq_num: {send_seqn - 1}\n")
@@ -152,9 +153,9 @@ def main():
     if paydeloader_src_pad and False:
         paydeloader_src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "rtph264depay_src")
     if decoder_sink_pad and True:
-        decoder_sink_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "decoder_sink")
+        decoder_sink_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "decoder_in")
     if decoder_src_pad and True:
-        decoder_src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "decoder_src")
+        decoder_src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "decoder_out")
     if server_sink_pad and False:
         server_sink_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "server_sink")
 
@@ -169,7 +170,7 @@ def main():
     global client_address
     init_message, client_address = ack_sock.recvfrom(1024)
     if init_message.decode() == 'init':
-        print(f"Init message from client {client_address} successfully received, sent back ack message and start GStreamer pipeline...")
+        print(f"Init message from client {client_address} successfully received, sent back ack message and start GStreamer pipeline...\n\n")
         ack_sock.sendto(b'ack', client_address)
     else:
         print(f"Wrong init message {init_message.decode()}, should be \"init\", from {client_address}, abort...")
