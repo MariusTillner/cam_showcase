@@ -46,7 +46,7 @@ def buffer_probe(pad, info, data):
         rec_dict = shared_dict[dec_seqn]
         rec_dict['dec_src_ts'] = current_time
         dec_seqn += 1
-    if False:
+    if True:
         print(f"{data} buffer_size: {buffer.get_size()} bytes, time: {current_time}")
     
     return Gst.PadProbeReturn.OK
@@ -86,12 +86,17 @@ def on_new_frame(sink):
 
     # Calculate and log the send delay
     current_time = time.perf_counter()
-    send_delay_ms = 1000 * (current_time - send_ts)
+    send_delay_us = 1e6 * (current_time - send_ts)
 
     # print status
     global rec_seqn
     global dec_seqn
-    print(f"rec_seqn: {rec_seqn}\ndec_seqn: {dec_seqn}\nsend_seqn: {send_seqn - 1}, dec_lat_ms: {dec_lat_ms:.3f}, proc_lat_ms: {proc_lat_ms:.3f}\n")
+    print(f"""
+    rec_seqn: {rec_seqn}
+    dec_seqn: {dec_seqn}\tdec_lat_ms: {dec_lat_ms:.3f}
+    send_seqn: {send_seqn - 1}\tproc_lat : {proc_lat_ms:.3f} ms, send_delay: {send_delay_us:.1f} us
+    Total lat:\t\t{1000*(current_time - dec_sink_ts):.3f} ms
+    """)
     #print(f"sended: {current_time:.6f}, send_delay: {send_delay_ms:.3f} ms, rec_seq_num: {rec_seqn}, send_seq_num: {send_seqn - 1}\n")
 
     return Gst.FlowReturn.OK
