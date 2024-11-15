@@ -90,12 +90,8 @@ def on_new_frame(sink):
 
     # print status
     global rec_seqn
-<<<<<<< HEAD
     global dec_seqn
     print(f"rec_seqn: {rec_seqn}\ndec_seqn: {dec_seqn}\nsend_seqn: {send_seqn - 1}, dec_lat_ms: {dec_lat_ms:.3f}, proc_lat_ms: {proc_lat_ms:.3f}\n")
-=======
-    print(f"send_seqn: {send_seqn - 1}, dec_lat_ms: {dec_lat_ms:.3f}, proc_lat_ms: {proc_lat_ms:.3f}")
->>>>>>> c169b65 (more verbose server output)
     #print(f"sended: {current_time:.6f}, send_delay: {send_delay_ms:.3f} ms, rec_seq_num: {rec_seqn}, send_seq_num: {send_seqn - 1}\n")
 
     return Gst.FlowReturn.OK
