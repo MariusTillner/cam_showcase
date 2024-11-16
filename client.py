@@ -33,12 +33,12 @@ ack_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 ######### FUNCTIONS #########
 #############################
 def log_buffer_probe(data, buffer_size):
-    if data == 'encoder_sink':
+    if data == 'x264enc_in':
         global raw_seqn
         frame_latency = FrameLatency(raw_seqn, buffer_size, time.perf_counter())
         shared_dict[raw_seqn] = frame_latency
         raw_seqn += 1
-    elif data == 'encoder_src':
+    elif data == 'x264enc_out':
         global enc_seqn
         frame_latency = shared_dict[enc_seqn]
         frame_latency.enc_buf_s = buffer_size
@@ -90,6 +90,22 @@ def ack_receiver_function():
         # increase local receive sequence number
         rec_seqn += 1
 
+def add_buffer_probe(pipeline, element_name, sink_pad: bool, src_pad: bool):
+    pipeline_element = pipeline.get_by_name(element_name)
+
+    if not pipeline_element:
+        print(f"{element_name} not found.")
+        sys.exit(1)
+
+    if sink_pad:
+        sink_pad = pipeline_element.get_static_pad("sink")
+        pad_name = element_name + "_in"
+        sink_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, pad_name)
+    if src_pad:
+        src_pad = pipeline_element.get_static_pad("src")
+        pad_name = element_name + "_out"
+        src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, pad_name)
+
 def main():
     # Create the GStreamer pipeline
     # Speed-preset: ultrafast, superfast, veryfast, faster, fast, medium (default), slow, slower
@@ -105,48 +121,11 @@ def main():
         udpsink host=127.0.0.1 port=5000 sync=false async=false name=udp
     """)
 
-    # Get the encoder and payloader elements
-    src = pipeline.get_by_name("src")
-    encoder = pipeline.get_by_name("x264enc")
-    payloader = pipeline.get_by_name("rtph264pay")
-    udp = pipeline.get_by_name("udp")
-
-    if not src:
-        print("src not found.")
-        sys.exit(1)
-
-    if not encoder:
-        print("encoder not found.")
-        sys.exit(1)
-
-    if not payloader:
-        print("payloader not found.")
-        sys.exit(1)
-
-    if not udp:
-        print("udp not found.")
-        sys.exit(1)
-
-    # Add buffer probes
-    encoder_sink_pad = encoder.get_static_pad("sink")
-    encoder_src_pad = encoder.get_static_pad("src")
-    payloader_sink_pad = payloader.get_static_pad("sink")
-    payloader_src_pad = payloader.get_static_pad("src")
-    udp_pad = udp.get_static_pad("sink")
-    src_pad = src.get_static_pad("src")
-
-    if src_pad and True:
-        src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "\nsrc")
-    if encoder_sink_pad and True:
-        encoder_sink_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "encoder_sink")
-    if encoder_src_pad and True:
-        encoder_src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "encoder_src")
-    if payloader_sink_pad and False:
-        payloader_sink_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "rtph264pay_sink")
-    if payloader_src_pad and False:
-        payloader_src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "rtph264pay_src")
-    if udp_pad and True:
-        udp_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "udp")
+    # add all buffer probes for measuring latency and logging infos
+    add_buffer_probe(pipeline, "src", sink_pad=False, src_pad=True)
+    add_buffer_probe(pipeline, "x264enc", sink_pad=True, src_pad=True)
+    add_buffer_probe(pipeline, "rtph264pay", sink_pad=False, src_pad=False)
+    add_buffer_probe(pipeline, "udp", sink_pad=False, src_pad=False)
 
     # Set up the main loop
     mainloop = GLib.MainLoop()
