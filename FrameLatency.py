@@ -26,7 +26,7 @@ class FrameLatency:
         return 1000*(self.enc_buf_ts - self.raw_buf_ts)
 
     def network_lat_ms(self):
-        return 1000*(self.ack_ts - self.enc_buf_ts) - self.server_proc_lat_ms
+        return 1000*(self.ack_ts - self.enc_buf_ts) - self.server_proc_lat_ms - self.server_dec_lat_ms
 
     def full_lat_ms(self):
         return 1000*(self.ack_ts - self.raw_buf_ts)
