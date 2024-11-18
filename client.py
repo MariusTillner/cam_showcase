@@ -60,6 +60,22 @@ def stop_pipeline(mainloop, pipeline):
     pipeline.set_state(Gst.State.NULL)
     mainloop.quit()
 
+def add_buffer_probe(pipeline, element_name, sink_pad: bool, src_pad: bool):
+    pipeline_element = pipeline.get_by_name(element_name)
+
+    if not pipeline_element:
+        print(f"{element_name} not found.")
+        sys.exit(1)
+
+    if sink_pad:
+        sink_pad = pipeline_element.get_static_pad("sink")
+        pad_name = element_name + "_in"
+        sink_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, pad_name)
+    if src_pad:
+        src_pad = pipeline_element.get_static_pad("src")
+        pad_name = element_name + "_out"
+        src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, pad_name)
+
 # The UDP receiver function (runs in a separate thread)
 def ack_receiver_function():
     while True:
@@ -89,22 +105,6 @@ def ack_receiver_function():
 
         # increase local receive sequence number
         rec_seqn += 1
-
-def add_buffer_probe(pipeline, element_name, sink_pad: bool, src_pad: bool):
-    pipeline_element = pipeline.get_by_name(element_name)
-
-    if not pipeline_element:
-        print(f"{element_name} not found.")
-        sys.exit(1)
-
-    if sink_pad:
-        sink_pad = pipeline_element.get_static_pad("sink")
-        pad_name = element_name + "_in"
-        sink_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, pad_name)
-    if src_pad:
-        src_pad = pipeline_element.get_static_pad("src")
-        pad_name = element_name + "_out"
-        src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, pad_name)
 
 def main():
     # Create the GStreamer pipeline

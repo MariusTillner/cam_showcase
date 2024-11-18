@@ -36,12 +36,12 @@ def buffer_probe(pad, info, data):
     buffer = info.get_buffer()
     current_time = time.perf_counter()
     
-    if data == 'decoder_sink':
+    if data == 'avdec_h264_in':
         rec_dict = {'dec_sink_ts': current_time, 'dec_src_ts': 0, 'buf_s': buffer.get_size()}
         global rec_seqn
         shared_dict[rec_seqn] = rec_dict
         rec_seqn += 1
-    elif data == 'decoder_src':
+    elif data == 'avdec_h264_out':
         global dec_seqn
         rec_dict = shared_dict[dec_seqn]
         rec_dict['dec_src_ts'] = current_time
@@ -50,6 +50,30 @@ def buffer_probe(pad, info, data):
         print(f"{data} buffer_size: {buffer.get_size()} bytes, time: {current_time}")
     
     return Gst.PadProbeReturn.OK
+
+def add_buffer_probe(pipeline, element_name, sink_pad: bool, src_pad: bool):
+    pipeline_element = pipeline.get_by_name(element_name)
+
+    if not pipeline_element:
+        print(f"{element_name} not found.")
+        sys.exit(1)
+
+    if sink_pad:
+        sink_pad = pipeline_element.get_static_pad("sink")
+        pad_name = element_name + "_in"
+        sink_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, pad_name)
+    if src_pad:
+        src_pad = pipeline_element.get_static_pad("src")
+        pad_name = element_name + "_out"
+        src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, pad_name)
+
+def add_appsink_callback(pipeline, element_name):
+    appsink = pipeline.get_by_name(element_name)
+    if not appsink:
+        print(f"{element_name} not found.")
+        sys.exit(1)
+    appsink_pad = appsink.get_static_pad(element_name)
+    appsink.connect('new-sample', on_new_frame) # Add Acknowledgment callback
 
 def stop_pipeline(mainloop, pipeline):
     print("Stopping pipeline...")
@@ -106,55 +130,18 @@ def main():
     avdec_h264 name=avdec_h264 ! 
     queue ! 
     tee name=t
-    t. ! queue ! appsink name=server_sink emit-signals=true sync=false drop=true
+    t. ! queue ! appsink name=appsink emit-signals=true sync=false drop=true
     t. ! queue ! videoconvert ! autovideosink
     """)
 
+    # add all buffer probes for measuring latency and logging infos
+    add_buffer_probe(pipeline, "udp_src", sink_pad=False, src_pad=False)
+    add_buffer_probe(pipeline, "avdec_h264", sink_pad=True, src_pad=True)
+    add_buffer_probe(pipeline, "rtph264depay", sink_pad=False, src_pad=False)
+    add_buffer_probe(pipeline, "appsink", sink_pad=False, src_pad=False)
+
     # Get the encoder and payloader elements
-    udp_src = pipeline.get_by_name("udp_src")
-    decoder = pipeline.get_by_name("avdec_h264")
-    paydeloader = pipeline.get_by_name("rtph264depay")
-    server_sink = pipeline.get_by_name("server_sink")
-
-    if not udp_src:
-        print("udp_src not found.")
-        sys.exit(1)
-
-    if not decoder:
-        print("decoder not found.")
-        sys.exit(1)
-
-    if not paydeloader:
-        print("paydeloader not found.")
-        sys.exit(1)
-
-    if not server_sink:
-        print("server_sink not found.")
-        sys.exit(1)
-
-    # Add buffer probes
-    udp_src_pad = udp_src.get_static_pad("src")
-    decoder_sink_pad = decoder.get_static_pad("sink")
-    decoder_src_pad = decoder.get_static_pad("src")
-    paydeloader_sink_pad = paydeloader.get_static_pad("sink")
-    paydeloader_src_pad = paydeloader.get_static_pad("src")
-    server_sink_pad = server_sink.get_static_pad("server_sink")
-
-    if udp_src_pad and False:
-        udp_src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "udp_src")
-    if paydeloader_sink_pad and False:
-        paydeloader_sink_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "rtph264depay_sink")
-    if paydeloader_src_pad and False:
-        paydeloader_src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "rtph264depay_src")
-    if decoder_sink_pad and True:
-        decoder_sink_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "decoder_sink")
-    if decoder_src_pad and True:
-        decoder_src_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "decoder_src")
-    if server_sink_pad and False:
-        server_sink_pad.add_probe(Gst.PadProbeType.BUFFER, buffer_probe, "server_sink")
-
-    # Add Acknowledgment callback
-    server_sink.connect('new-sample', on_new_frame)
+    add_appsink_callback(pipeline, "appsink")
 
     # Set up the main loop
     mainloop = GLib.MainLoop()
