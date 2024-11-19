@@ -127,11 +127,9 @@ def main():
     # Tune: fastdecode, zerolatency
     pipeline = Gst.parse_launch("""
         vmbsrc camera=DEV_000A47000430 settingsfile=/home/pi/marius/cam.xml name=src ! 
-        queue ! 
-        videoconvert ! 
+        queue ! videoconvert ! video/x-raw,format=I420 ! \
         x264enc speed-preset=ultrafast tune=zerolatency name=x264enc ! 
-        h264parse ! 
-        rtph264pay config-interval=1 name=rtph264pay ! 
+        h264parse ! rtph264pay config-interval=1 name=rtph264pay ! 
         udpsink host=192.168.70.129 port=5000 sync=false async=false name=udp
     """)
 
