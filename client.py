@@ -104,8 +104,9 @@ def ack_receiver_function():
 
         # check if there is a mismatch of received sequence number of server and client sequence number
         if server_rec_seqn != rec_seqn:
-            print(f"server_rec_seqn\t{server_rec_seqn} does not match rec_seqn: {rec_seqn}")
+            print(f"server_rec_seqn\t{server_rec_seqn} does not match rec_seqn: {rec_seqn}, offset: {server_rec_seqn - rec_seqn}")
             print(f"jumping frame: {', '.join(str(i) for i in range(rec_seqn, server_rec_seqn))}")
+            rec_seqn = server_rec_seqn
         
         # Retrieve the current frame's latency information
         frame_latency = shared_dict[server_rec_seqn]

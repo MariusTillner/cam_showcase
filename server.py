@@ -136,7 +136,7 @@ def on_new_frame(sink):
     print(f"""
     \t\trec_seqn: {rec_seqn}
     \t\tdec_seqn: {dec_seqn}
-    \t\tsend_seqn: {ack_seqn}
+    \t\tack_seqn: {ack_seqn}
     \t\tdec_lat: {dec_lat_ms:.3f} ms
     \t\tproc_lat: {proc_lat_ms:.3f} ms
     \t\ttime_since_last_send: {1000*(current_time - last_send_ts):.3f} ms
