@@ -17,9 +17,13 @@ from gi.repository import Gst, GLib
 Gst.init(None)
 
 # Global sequence numbers
-raw_seqn = 0    # global raw sequence number that counts the appearing raw frames
-enc_seqn = 0    # global ecoded sequence number that counts the encoded frames
-rec_seqn = 0    # global receive sequence number that counts the receive frames
+raw_seqn = -1    # global raw sequence number that counts the appearing raw frames
+enc_seqn = -1    # global ecoded sequence number that counts the encoded frames
+rec_seqn = -1    # global receive sequence number that counts the receive frames
+
+# global timestamps to track periodicity in the pipeline
+raw_ts = 0
+rec_ts = 0
 
 # shared dict that will save the FrameLatency instances that will track the different latencies of a frame
 shared_dict = {}
@@ -33,25 +37,29 @@ ack_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 ######### FUNCTIONS #########
 #############################
 def log_buffer_probe(data, buffer_size):
-    if data == 'x264enc_in':
+    if data == 'src_out':
+        global raw_ts
+        current_time = time.perf_counter()
+        print(f"{data}\t\ttime since last call: {1000*(current_time - raw_ts):.3f} ms")
+        raw_ts = current_time
+    elif data == 'x264enc_in':
         global raw_seqn
+        raw_seqn += 1
         frame_latency = FrameLatency(raw_seqn, buffer_size, time.perf_counter())
         shared_dict[raw_seqn] = frame_latency
-        raw_seqn += 1
     elif data == 'x264enc_out':
         global enc_seqn
+        enc_seqn += 1
         frame_latency = shared_dict[enc_seqn]
         frame_latency.enc_buf_s = buffer_size
         frame_latency.enc_buf_ts = time.perf_counter()
-        enc_seqn += 1
     else:
         pass
 
 def buffer_probe(pad, info, data):
     buffer = info.get_buffer()
-    current_time = time.perf_counter()
     if False:
-        print(f"{data} buffer_size: {buffer.get_size()} bytes, time: {current_time}")
+        print(f"{data} buffer_size: {buffer.get_size()} bytes, time: {time.perf_counter()}")
     log_buffer_probe(data, buffer.get_size())
     return Gst.PadProbeReturn.OK
 
@@ -84,10 +92,20 @@ def ack_receiver_function():
         server_rec_seqn, server_dec_lat_ms_str, server_proc_lat_ms_str, buffer_size_str = data.decode().split(",")
         server_rec_seqn = int(server_rec_seqn) # string to int
 
-        # check if there is a mismatch of received sequence number of server and client sequence number
+        # increase local receive sequence number
         global rec_seqn
+        rec_seqn += 1
+
+        # print periodicity
+        global rec_ts
+        current_time = time.perf_counter()
+        print(f"ack_rec_fun\ttime since last receive: {1000*(current_time - rec_ts):.3f} ms")
+        rec_ts = current_time
+
+        # check if there is a mismatch of received sequence number of server and client sequence number
         if server_rec_seqn != rec_seqn:
-            print(f"server_rec_seqn: {server_rec_seqn} does not match rec_seqn: {rec_seqn}")
+            print(f"server_rec_seqn\t{server_rec_seqn} does not match rec_seqn: {rec_seqn}")
+            print(f"jumping frame: {', '.join(str(i) for i in range(rec_seqn, server_rec_seqn))}")
         
         # Retrieve the current frame's latency information
         frame_latency = shared_dict[server_rec_seqn]
@@ -101,10 +119,7 @@ def ack_receiver_function():
         frame_latency.server_dec_lat_ms = float(server_dec_lat_ms_str)
         
         # Print the frame latency information
-        print(f"{frame_latency}\n")
-
-        # increase local receive sequence number
-        rec_seqn += 1
+        print(f"\n{frame_latency}\n\n")
 
 def main():
     # Create the GStreamer pipeline
