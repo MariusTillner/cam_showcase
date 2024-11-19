@@ -126,8 +126,7 @@ def main():
     # Speed-preset: ultrafast, superfast, veryfast, faster, fast, medium (default), slow, slower
     # Tune: fastdecode, zerolatency
     pipeline = Gst.parse_launch("""
-        videotestsrc pattern=snow name=src ! 
-        video/x-raw,width=1080,height=720,framerate=30/1 ! 
+        vmbsrc camera=DEV_000A47000430 settingsfile=/home/pi/marius/cam.xml name=src ! 
         queue ! 
         videoconvert ! 
         x264enc speed-preset=ultrafast tune=zerolatency name=x264enc ! 
