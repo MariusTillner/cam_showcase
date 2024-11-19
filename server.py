@@ -18,6 +18,10 @@ rec_seqn = -1    # global receive sequence number that counts and labels receive
 dec_seqn = -1    # global decoded sequence number that counts and labels decoded frames
 local_ack_seqn = -1 # global variable that saves the local counter for function on_new_frame 
 
+# Global timestamps to track periodicity in the pipeline
+rec_ts = 0
+last_send_ts = 0
+
 # Dict that will save the latencies of received frames, latency data will be saved as dict
 shared_dict = {}
 
@@ -41,7 +45,12 @@ def buffer_probe(pad, info, data):
         rec_seqn += 1
         rec_dict = {'dec_sink_ts': current_time, 'dec_src_ts': 0, 'buf_s': buffer.get_size()}
         shared_dict[rec_seqn] = rec_dict
-        print(f"{data}\ttime: {current_time} rec_seqn: {rec_seqn} buffer_size: {buffer.get_size()} bytes")
+        global rec_ts
+        print(f"""{data}\ttime: {current_time} 
+        \ttime_since_last_rec: {1000*(current_time - rec_ts):.3f} ms 
+        \trec_seqn: {rec_seqn}
+        \tbuffer_size: {buffer.get_size()} bytes\n""")
+        rec_ts = current_time
     elif data == 'avdec_h264_out':
         global dec_seqn
         # set decode sequence number to receive seqnum, because high jitter sometimes throws away
@@ -49,7 +58,9 @@ def buffer_probe(pad, info, data):
         dec_seqn = rec_seqn
         rec_dict = shared_dict[dec_seqn]
         rec_dict['dec_src_ts'] = current_time
-        print(f"{data}\ttime: {current_time} dec_seqn: {dec_seqn} buffer_size: {buffer.get_size()} bytes")
+        print(f"""{data}\ttime: {current_time} 
+        \tdec_seqn: {dec_seqn} 
+        \tbuffer_size: {buffer.get_size()} bytes\n""")
     return Gst.PadProbeReturn.OK
 
 def add_buffer_probe(pipeline, element_name, sink_pad: bool, src_pad: bool):
@@ -87,7 +98,9 @@ def on_new_frame(sink):
     ack_seqn = dec_seqn
     global local_ack_seqn
     local_ack_seqn += 1
-    print(f"on_new_frame ack_seqn: {ack_seqn}, local_ack_seqn: {local_ack_seqn}, time: {time.perf_counter()}")
+    print(f"""on_new_frame\ttime: {time.perf_counter()}
+    \t\tack_seqn: {ack_seqn}
+    \t\tlocal_ack_seqn: {local_ack_seqn}""")
 
     # Retrieve the buffer from appsink
     sample = sink.emit('pull-sample')
@@ -118,8 +131,17 @@ def on_new_frame(sink):
 
     # print status
     global rec_seqn
-    print(f"\nrec_seqn: {rec_seqn}\ndec_seqn: {dec_seqn}\nsend_seqn: {ack_seqn}, dec_lat: {dec_lat_ms:.3f} ms, proc_lat: {proc_lat_ms:.3f} ms\n\n")
-    #print(f"sended: {current_time:.6f}, send_delay: {send_delay_ms:.3f} ms, rec_seq_num: {rec_seqn}, send_seq_num: {send_seqn - 1}\n")
+    global last_send_ts
+    current_time = time.perf_counter()
+    print(f"""
+    \t\trec_seqn: {rec_seqn}
+    \t\tdec_seqn: {dec_seqn}
+    \t\tsend_seqn: {ack_seqn}
+    \t\tdec_lat: {dec_lat_ms:.3f} ms
+    \t\tproc_lat: {proc_lat_ms:.3f} ms
+    \t\ttime_since_last_send: {1000*(current_time - last_send_ts):.3f} ms
+    \n""")
+    last_send_ts = current_time
 
     return Gst.FlowReturn.OK
 
