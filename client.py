@@ -134,10 +134,7 @@ def add_receive_data_to_dict(server_rec_seqn, server_dec_lat_ms, server_proc_lat
         end_index = max(shared_dict.keys())
         for i in range(start_index, end_index):
             if shared_dict[i].enc_buf_s == buffer_size:
-<<<<<<< HEAD
                 frame_latency = shared_dict[i]
-=======
->>>>>>> 2ec7d72 (testing)
                 frame_latency.ack_ts = time.perf_counter()
                 frame_latency.ack_enc_s = buffer_size
                 frame_latency.server_dec_lat_ms = server_dec_lat_ms
@@ -150,8 +147,7 @@ def main():
     # Speed-preset: ultrafast, superfast, veryfast, faster, fast, medium (default), slow, slower
     # Tune: fastdecode, zerolatency
     pipeline = Gst.parse_launch("""
-        videotestsrc pattern=snow name=src ! 
-        video/x-raw,width=1080,height=720,framerate=30/1 ! 
+        vmbsrc camera=DEV_000A47000430 settingsfile=/home/pi/marius/cam.xml name=src ! 
         queue ! 
         videoconvert ! 
         x264enc speed-preset=ultrafast tune=zerolatency name=x264enc ! 
