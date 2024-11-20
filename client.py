@@ -6,6 +6,7 @@ import threading
 from threading import Lock
 import socket
 from frame_latency import FrameLatency
+from mystatistics import MyStatistics
 gi.require_version('Gst', '1.0')
 from gi.repository import Gst, GLib
 
@@ -134,6 +135,7 @@ def add_receive_data_to_dict(server_rec_seqn, server_dec_lat_ms, server_proc_lat
             frame_latency.ack_enc_s = server_dec_buf_s
             frame_latency.server_dec_lat_ms = server_dec_lat_ms
             frame_latency.server_proc_lat_ms = server_proc_lat_ms
+            frame_latency.complete = True
             return frame_latency
     #print(f"No match found!!!!!!!!!!client_ack_seqn: {rec_seqn}, server_ack_seqn: {server_rec_seqn}, indexes {start_index}-{end_index}")
 
@@ -179,6 +181,9 @@ def main():
         mainloop.run()
     except:
         stop_pipeline(mainloop, pipeline)
+        global shared_dict
+        mystat = MyStatistics(shared_dict)
+        mystat.print_statistics()
         sys.exit(1)
 
     # Clean up after main loop exits
