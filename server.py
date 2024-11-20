@@ -27,7 +27,7 @@ shared_dict = {}
 
 # set up acknowledgment socket
 ack_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-server_address = ("192.168.70.129", 5001)
+server_address = ("10.0.0.2", 5001)
 ack_sock.bind(server_address)
 client_address = None # Will be set after receiving the initial message from client
 print(f"Server Socket is listening on {server_address}")
