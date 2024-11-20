@@ -134,7 +134,10 @@ def add_receive_data_to_dict(server_rec_seqn, server_dec_lat_ms, server_proc_lat
         end_index = max(shared_dict.keys())
         for i in range(start_index, end_index):
             if shared_dict[i].enc_buf_s == buffer_size:
+<<<<<<< HEAD
                 frame_latency = shared_dict[i]
+=======
+>>>>>>> 2ec7d72 (testing)
                 frame_latency.ack_ts = time.perf_counter()
                 frame_latency.ack_enc_s = buffer_size
                 frame_latency.server_dec_lat_ms = server_dec_lat_ms
