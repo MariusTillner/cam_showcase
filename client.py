@@ -102,13 +102,13 @@ def ack_receiver_function():
         # print periodicity
         global rec_ts
         current_time = time.perf_counter()
-        print(f"ack_rec_fun\ttime since last receive: {1000*(current_time - rec_ts):.3f} ms")
+        #print(f"ack_rec_fun\ttime since last receive: {1000*(current_time - rec_ts):.3f} ms")
         rec_ts = current_time
 
         # check if there is a mismatch of received sequence number of server and client sequence number
         if server_rec_seqn != rec_seqn:
-            print(f"server_rec_seqn\t{server_rec_seqn} does not match rec_seqn: {rec_seqn}, offset: {server_rec_seqn - rec_seqn}")
-            print(f"jumping frame: {', '.join(str(i) for i in range(rec_seqn, server_rec_seqn))}")
+            #print(f"server_rec_seqn\t{server_rec_seqn} does not match rec_seqn: {rec_seqn}, offset: {server_rec_seqn - rec_seqn}")
+            #print(f"jumping frame: {', '.join(str(i) for i in range(rec_seqn, server_rec_seqn))}")
             rec_seqn = server_rec_seqn
         
         # match receive data to correct frame latency instance and calculate latencies
@@ -127,15 +127,15 @@ def add_receive_data_to_dict(server_rec_seqn, server_dec_lat_ms, server_proc_lat
         client_enc_buf_s = frame_latency.enc_buf_s
         # look for match in H264 encoded buffer size
         if client_enc_buf_s == server_dec_buf_s:
-            print(f"""client_ack_seqn {rec_seqn}\
-            server_ack_seqn: {server_rec_seqn}\
-            indexes: {start_index}-{end_index}, found at {i}""")
+            #print(f"""client_ack_seqn {rec_seqn}\
+            #server_ack_seqn: {server_rec_seqn}\
+            #indexes: {start_index}-{end_index}, found at {i}""")
             frame_latency.ack_ts = time.perf_counter()
             frame_latency.ack_enc_s = server_dec_buf_s
             frame_latency.server_dec_lat_ms = server_dec_lat_ms
             frame_latency.server_proc_lat_ms = server_proc_lat_ms
             return frame_latency
-    print(f"No match found!!!!!!!!!!client_ack_seqn: {rec_seqn}, server_ack_seqn: {server_rec_seqn}, indexes {start_index}-{end_index}")
+    #print(f"No match found!!!!!!!!!!client_ack_seqn: {rec_seqn}, server_ack_seqn: {server_rec_seqn}, indexes {start_index}-{end_index}")
 
 def main():
     # Create the GStreamer pipeline
