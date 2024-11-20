@@ -40,7 +40,7 @@ def log_buffer_probe(data, buffer_size):
     if data == 'src_out':
         global raw_ts
         current_time = time.perf_counter()
-        print(f"{data}\t\ttime since last call: {1000*(current_time - raw_ts):.3f} ms")
+        #print(f"{data}\t\ttime since last call: {1000*(current_time - raw_ts):.3f} ms")
         raw_ts = current_time
     elif data == 'x264enc_in':
         global raw_seqn
@@ -58,7 +58,7 @@ def log_buffer_probe(data, buffer_size):
 
 def buffer_probe(pad, info, data):
     buffer = info.get_buffer()
-    if True:
+    if False:
         print(f"{data} buffer_size: {buffer.get_size()} bytes, time: {time.perf_counter()}")
     log_buffer_probe(data, buffer.get_size())
     return Gst.PadProbeReturn.OK
@@ -117,30 +117,25 @@ def ack_receiver_function():
         # Print the frame latency information
         print(f"\n{frame_latency}\n\n")
 
-def add_receive_data_to_dict(server_rec_seqn, server_dec_lat_ms, server_proc_lat_ms, buffer_size):
+def add_receive_data_to_dict(server_rec_seqn, server_dec_lat_ms, server_proc_lat_ms, server_dec_buf_s):
     global shared_dict
     global rec_seqn
-    if server_rec_seqn == rec_seqn:
-        frame_latency = shared_dict[server_rec_seqn]
-        if buffer_size != frame_latency.enc_buf_s:
-            print(f"seqn matches, but buffer size doesnt, enc_s: {frame_latency.enc_buf_s} and ack_s: {buffer_size}")
-        frame_latency.ack_ts = time.perf_counter()
-        frame_latency.ack_enc_s = buffer_size
-        frame_latency.server_dec_lat_ms = server_dec_lat_ms
-        frame_latency.server_proc_lat_ms = server_proc_lat_ms
-    else:
-        print(print(f"server_rec_seqn\t{server_rec_seqn} does not match rec_seqn: {rec_seqn}, offset: {server_rec_seqn - rec_seqn}"))
-        start_index = max(rec_seqn-3, 0)
-        end_index = max(shared_dict.keys())
-        for i in range(start_index, end_index):
-            if shared_dict[i].enc_buf_s == buffer_size:
-                frame_latency = shared_dict[i]
-                frame_latency.ack_ts = time.perf_counter()
-                frame_latency.ack_enc_s = buffer_size
-                frame_latency.server_dec_lat_ms = server_dec_lat_ms
-                frame_latency.server_proc_lat_ms = server_proc_lat_ms
-        rec_seqn = i
-    return frame_latency
+    end_index = max(shared_dict.keys())
+    start_index = max(0, end_index-15)
+    for i in range(end_index, start_index-1, -1):
+        frame_latency = shared_dict[i]
+        client_enc_buf_s = frame_latency.enc_buf_s
+        # look for match in H264 encoded buffer size
+        if client_enc_buf_s == server_dec_buf_s:
+            print(f"""client_ack_seqn {rec_seqn}\
+            server_ack_seqn: {server_rec_seqn}\
+            indexes: {start_index}-{end_index}, found at {i}""")
+            frame_latency.ack_ts = time.perf_counter()
+            frame_latency.ack_enc_s = server_dec_buf_s
+            frame_latency.server_dec_lat_ms = server_dec_lat_ms
+            frame_latency.server_proc_lat_ms = server_proc_lat_ms
+            return frame_latency
+    print(f"No match found!!!!!!!!!!client_ack_seqn: {rec_seqn}, server_ack_seqn: {server_rec_seqn}, indexes {start_index}-{end_index}")
 
 def main():
     # Create the GStreamer pipeline
