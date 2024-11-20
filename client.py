@@ -58,7 +58,7 @@ def log_buffer_probe(data, buffer_size):
 
 def buffer_probe(pad, info, data):
     buffer = info.get_buffer()
-    if False:
+    if True:
         print(f"{data} buffer_size: {buffer.get_size()} bytes, time: {time.perf_counter()}")
     log_buffer_probe(data, buffer.get_size())
     return Gst.PadProbeReturn.OK
@@ -91,6 +91,9 @@ def ack_receiver_function():
         data, _ = ack_sock.recvfrom(4096)
         server_rec_seqn, server_dec_lat_ms_str, server_proc_lat_ms_str, buffer_size_str = data.decode().split(",")
         server_rec_seqn = int(server_rec_seqn) # string to int
+        server_dec_lat_ms = float(server_dec_lat_ms_str)
+        server_proc_lat_ms = float(server_proc_lat_ms_str)
+        buffer_size = int(buffer_size_str)
 
         # increase local receive sequence number
         global rec_seqn
@@ -108,19 +111,36 @@ def ack_receiver_function():
             print(f"jumping frame: {', '.join(str(i) for i in range(rec_seqn, server_rec_seqn))}")
             rec_seqn = server_rec_seqn
         
-        # Retrieve the current frame's latency information
-        frame_latency = shared_dict[server_rec_seqn]
-        
-        # Update the acknowledgment timestamp
-        frame_latency.ack_ts = time.perf_counter()
-        
-        # decode the rest of the received data and fill the FrameLatency class with its data
-        frame_latency.ack_enc_s = int(buffer_size_str)
-        frame_latency.server_proc_lat_ms = float(server_proc_lat_ms_str)
-        frame_latency.server_dec_lat_ms = float(server_dec_lat_ms_str)
+        # match receive data to correct frame latency instance and calculate latencies
+        frame_latency = add_receive_data_to_dict(server_rec_seqn, server_dec_lat_ms, server_proc_lat_ms, buffer_size)
         
         # Print the frame latency information
         print(f"\n{frame_latency}\n\n")
+
+def add_receive_data_to_dict(server_rec_seqn, server_dec_lat_ms, server_proc_lat_ms, buffer_size):
+    global shared_dict
+    global rec_seqn
+    if server_rec_seqn == rec_seqn:
+        frame_latency = shared_dict[server_rec_seqn]
+        if buffer_size != frame_latency.enc_buf_s:
+            print(f"seqn matches, but buffer size doesnt, enc_s: {frame_latency.enc_buf_s} and ack_s: {buffer_size}")
+        frame_latency.ack_ts = time.perf_counter()
+        frame_latency.ack_enc_s = buffer_size
+        frame_latency.server_dec_lat_ms = server_dec_lat_ms
+        frame_latency.server_proc_lat_ms = server_proc_lat_ms
+    else:
+        print(print(f"server_rec_seqn\t{server_rec_seqn} does not match rec_seqn: {rec_seqn}, offset: {server_rec_seqn - rec_seqn}"))
+        start_index = max(rec_seqn-3, 0)
+        end_index = max(shared_dict.keys())
+        for i in range(start_index, end_index):
+            if shared_dict[i].enc_buf_s == buffer_size:
+                frame_latency = shared_dict[i]
+                frame_latency.ack_ts = time.perf_counter()
+                frame_latency.ack_enc_s = buffer_size
+                frame_latency.server_dec_lat_ms = server_dec_lat_ms
+                frame_latency.server_proc_lat_ms = server_proc_lat_ms
+        rec_seqn = i
+    return frame_latency
 
 def main():
     # Create the GStreamer pipeline

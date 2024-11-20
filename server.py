@@ -123,7 +123,8 @@ def on_new_frame(sink):
     ack_message = f"{ack_seqn},{dec_lat_ms:.3f},{proc_lat_ms:.3f},{buf_s}"
 
     # Send the acknowledgment message to the client
-    ack_sock.sendto(ack_message.encode(), client_address)
+    if local_ack_seqn != 20:
+        ack_sock.sendto(ack_message.encode(), client_address)
 
     # Calculate and log the send delay
     current_time = time.perf_counter()
